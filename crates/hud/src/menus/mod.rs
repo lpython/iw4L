@@ -246,15 +246,12 @@ impl Runner<'_, '_> {
             Command::ScriptMenuResponse(response) => {
                 self.menus.responses.push((menu.to_owned(), response));
             }
-            Command::Exec(text) => self.menus.exec.push(text),
+            Command::Exec(text) => self.exec(text),
             Command::CopyDvar(name, source) => {
                 let value = self.dvar(&source).unwrap_or_default().to_owned();
                 self.dvars.set(&name, value);
             }
-            Command::SetDvar(name, value) => {
-                self.dvars.set(&name, &value);
-                self.menus.exec.push(format!("set {name} \"{value}\""));
-            }
+            Command::SetDvar(name, value) => self.set_dvar(&name, &value),
             Command::ExecOnDvarIntValue {
                 dvar,
                 value,
@@ -265,7 +262,7 @@ impl Runner<'_, '_> {
                     .and_then(|s| s.parse::<f32>().ok())
                     .unwrap_or(0.0) as i32;
                 if current == value {
-                    self.menus.exec.push(command);
+                    self.exec(command);
                 }
             }
             Command::ExecOnDvarStringValue {
@@ -275,7 +272,7 @@ impl Runner<'_, '_> {
             } => {
                 let current = self.dvar(&dvar);
                 if current.is_some_and(|c| c.eq_ignore_ascii_case(&value)) {
-                    self.menus.exec.push(command);
+                    self.exec(command);
                 }
             }
             Command::OpenForGameType(format) => {
@@ -323,6 +320,73 @@ impl Runner<'_, '_> {
                 diag::debug!(Ui, "menu {menu}: script command `{name}` not run");
             }
         }
+    }
+
+    /// `toggle` and cfg `exec` land in the menu dvars before the next script
+    /// command runs, so a following `execNowOnDvarIntValue` sees the result.
+    fn exec(&mut self, text: String) {
+        let words: Vec<&str> = text
+            .split_whitespace()
+            .map(|word| word.trim_matches('"'))
+            .collect();
+        match words.as_slice() {
+            ["toggle", name, values @ ..] => {
+                let current = self.dvar(name).unwrap_or("0");
+                let next = match values {
+                    [] => {
+                        if current.parse::<f32>().is_ok_and(|n| n != 0.0) {
+                            "0"
+                        } else {
+                            "1"
+                        }
+                    }
+                    _ => {
+                        let choices: Vec<_> = values
+                            .iter()
+                            .map(|v| (String::new(), (*v).to_owned()))
+                            .collect();
+                        values
+                            [choice_index(&choices, current).map_or(0, |i| (i + 1) % values.len())]
+                    }
+                };
+                self.set_dvar(name, next);
+            }
+            ["exec", file] if file.ends_with(".cfg") => {
+                let Some(config) = self.catalog.rawfile_text(file) else {
+                    self.menus.exec.push(text);
+                    return;
+                };
+                let defaults = self
+                    .catalog
+                    .rawfile_text("default_xboxlive.cfg")
+                    .unwrap_or("");
+                for line in config.lines() {
+                    let mut words = line.split_whitespace();
+                    match (words.next(), words.next(), words.next()) {
+                        (Some("set" | "seta"), Some(name), value) => {
+                            self.set_dvar(name, value.unwrap_or("").trim_matches('"'));
+                        }
+                        (Some("reset"), Some(name), _) => {
+                            if let Some(value) = defaults.lines().find_map(|line| {
+                                let mut words = line.split_whitespace();
+                                (words.next() == Some("set")
+                                    && words.next().is_some_and(|n| n.eq_ignore_ascii_case(name)))
+                                .then(|| words.next().unwrap_or("").trim_matches('"'))
+                            }) {
+                                self.set_dvar(name, value);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            _ => self.menus.exec.push(text),
+        }
+    }
+
+    fn set_dvar(&mut self, name: &str, value: &str) {
+        self.dvars.set(name, value);
+        self.menus.exec.push(format!("set {name} \"{value}\""));
     }
 
     fn dvar(&self, name: &str) -> Option<&str> {
@@ -570,11 +634,7 @@ impl Runner<'_, '_> {
         }
         let current = self.dvar(&item.dvar).unwrap_or_default();
         let value = if !item.choices.is_empty() {
-            let at = item
-                .choices
-                .iter()
-                .position(|(_, value)| value == current)
-                .unwrap_or(0);
+            let at = choice_index(&item.choices, current).unwrap_or(0);
             let next = (at as i32 + step).rem_euclid(item.choices.len() as i32) as usize;
             item.choices[next].1.clone()
         } else {
@@ -637,6 +697,13 @@ impl Runner<'_, '_> {
     }
 }
 
+fn choice_index(choices: &[(String, String)], value: &str) -> Option<usize> {
+    let number = value.trim().parse::<f32>().ok();
+    choices.iter().position(|(_, choice)| {
+        choice == value || number.is_some_and(|n| choice.trim().parse::<f32>() == Ok(n))
+    })
+}
+
 fn painted_def(def: &MenuDef, open: &OpenMenu) -> MenuDef {
     let (mut out, _) = crate::killcam_skip::inherit_shared_vis(def);
     for (item, state) in out.items.iter_mut().zip(&open.items) {
@@ -649,6 +716,12 @@ fn painted_def(def: &MenuDef, open: &OpenMenu) -> MenuDef {
         if let Some(color) = state.back {
             item.back_color = color;
         }
+    }
+    if let Some(color) = def.focus_color.filter(|color| color[3] > 0.0)
+        && let Some(item) = open.focus.and_then(|index| out.items.get_mut(index))
+        && (!item.text_key.is_empty() || !item.text_exp.is_empty())
+    {
+        item.fore_color = color;
     }
     out
 }
@@ -954,16 +1027,10 @@ pub(crate) fn update_script_menus(
             }
             if !item.choices.is_empty() {
                 let value = out.dvars.get(&item.dvar).unwrap_or_default();
-                item.text_key = item
-                    .choices
-                    .iter()
-                    .find(|(_, v)| v == value)
-                    .map(|(label, _)| label.clone())
+                item.text_key = choice_index(&item.choices, value)
+                    .map(|at| item.choices[at].0.clone())
                     .unwrap_or_else(|| value.to_owned());
                 item.text_exp.clear();
-                item.text_align_mode = 10;
-                item.text_align_x = -8.0;
-                item.text_align_y = 0.0;
             }
         }
         if let Some(edit) = &menus.editing

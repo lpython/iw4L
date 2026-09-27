@@ -22,7 +22,16 @@ impl UiMenuDvars {
     pub fn set(&mut self, name: &str, value: impl Into<String>) {
         self.values.insert(name.to_ascii_lowercase(), value.into());
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.values
+            .iter()
+            .map(|(name, value)| (name.as_str(), value.as_str()))
+    }
 }
+
+#[derive(Resource, Clone, Default, Debug)]
+pub struct HostMatchRules(pub Vec<(String, String)>);
 
 #[derive(Resource, Default)]
 pub struct UiBindingCapture {

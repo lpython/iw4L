@@ -116,7 +116,10 @@
               }
             ]
           },
-          "disabled_exp": "0"
+          "disabled_exp": "0",
+          "text_align_mode": 10,
+          "text_align_x": -8,
+          "text_align_y": 0
         }
       },
       {

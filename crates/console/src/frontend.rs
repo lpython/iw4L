@@ -5,14 +5,17 @@ use frame::{UiMenuDvars, UiMenuRequest, UiPartyState};
 use crate::{CommandSpec, ConsoleCommand, ConsoleRegistry};
 
 const PAGE_SIZE: usize = 10;
+const PACK_SLOTS: usize = 8;
 
 #[derive(Default)]
 pub(crate) struct FrontendState {
     public: bool,
+    map_pack: usize,
     map_page: usize,
     map_hover: usize,
     browser_page: usize,
     adverts: Vec<net::MasterAdvert>,
+    rules_seeded: bool,
 }
 
 #[derive(SystemParam)]
@@ -28,7 +31,7 @@ impl LobbyServices<'_> {
         if !self
             .intent
             .as_ref()
-            .is_some_and(|intent| intent.browser_available())
+            .is_some_and(|intent| intent.configured())
         {
             return Err("Public lobbies require a configured master".into());
         }
@@ -52,6 +55,7 @@ pub(crate) fn register(registry: &mut ConsoleRegistry) {
         "ui_lobby_privacy",
         "ui_vote_skip",
         "ui_maps",
+        "ui_map_pack",
         "ui_map_hover",
         "ui_map_page",
         "ui_select_map",
@@ -74,12 +78,23 @@ fn map_label(map: &str) -> String {
         .to_uppercase()
 }
 
+fn map_preview(map: &str) -> String {
+    match map.split_once(':').unwrap_or(("iw4", map)) {
+        (_, "") => String::new(),
+        ("t5", stem) => format!(
+            "t5:material/menu_mp_map_select_{}_big",
+            stem.trim_start_matches("mp_")
+        ),
+        (namespace, stem) => format!("{namespace}:material/preview_{stem}"),
+    }
+}
+
 fn selected_game(
     dvars: &UiMenuDvars,
     maps: &ui::MenuMapList,
 ) -> Result<(String, sim::HostGameModeSelection), String> {
     let map = dvars.get("ui_mapname").ok_or("No map selected")?;
-    if !maps.0.iter().any(|installed| installed == map) {
+    if !maps.contains(map) {
         return Err(format!("Map `{map}` is not installed"));
     }
     let mode = dvars
@@ -87,6 +102,43 @@ fn selected_game(
         .and_then(sim::HostGameModeSelection::from_token)
         .ok_or("Unsupported game mode")?;
     Ok((map.to_owned(), mode))
+}
+
+const MATCH_CONFIG: &str = "default_xboxlive.cfg";
+
+fn is_rule(name: &str) -> bool {
+    name.starts_with("scr_") || name == "g_hardcore"
+}
+
+fn seed_rules(dvars: &mut UiMenuDvars, config: &str) {
+    for line in config.lines() {
+        let line = line.split("//").next().unwrap_or("").trim();
+        let Some(rest) = line.strip_prefix("set ") else {
+            continue;
+        };
+        let mut words = rest.split_whitespace();
+        let (Some(name), value) = (words.next(), words.next().unwrap_or("")) else {
+            continue;
+        };
+        let name = name.to_ascii_lowercase();
+        if is_rule(&name) && dvars.get(&name).is_none() {
+            dvars.set(&name, value.trim_matches('"'));
+        }
+    }
+}
+
+fn host_rules(dvars: &UiMenuDvars) -> frame::HostMatchRules {
+    frame::HostMatchRules(
+        dvars
+            .iter()
+            .filter(|(name, _)| is_rule(name))
+            .map(|(name, value)| (name.to_owned(), value.to_owned()))
+            .collect(),
+    )
+}
+
+fn pack_maps(maps: &ui::MenuMapList, pack: usize) -> &[String] {
+    maps.0.get(pack).map_or(&[], |pack| pack.maps.as_slice())
 }
 
 fn change_page(page: &mut usize, command: &ConsoleCommand, len: usize) {
@@ -111,16 +163,38 @@ pub(crate) fn route(
     maps: Res<ui::MenuMapList>,
     settings: Res<frame::GameSettings>,
     localize: Option<Res<assets::LocalizeCatalog>>,
+    catalog: Option<Res<assets::MenuCatalog>>,
     mut services: LobbyServices,
     mut state: Local<FrontendState>,
     mut echo: crate::feature_dispatch::ConsoleEcho,
 ) {
-    if returned.read().count() > 0 {
+    let mut returned_from_world = false;
+    let mut returned_in_menu = false;
+    for fact in returned.read() {
+        returned_from_world |= fact.had_world;
+        returned_in_menu |= !fact.had_world;
+    }
+    if returned_from_world {
+        commands.remove_resource::<frame::HostMatchRules>();
         *party = UiPartyState::default();
         state.public = false;
+    } else if returned_in_menu && state.public {
+        let reason = match services.bridge.as_ref().map(|bridge| bridge.state()) {
+            Some(net::MasterBridgeState::Failed { error, .. }) => format!("{error:?}"),
+            Some(net::MasterBridgeState::Closed { reason, .. }) => {
+                format!("Lobby closed: {reason:?}")
+            }
+            _ => "Public lobby ended".into(),
+        };
+        state.public = false;
+        if !party.is_host {
+            *party = UiPartyState::default();
+            menus.write(UiMenuRequest::Close("game_lobby".into()));
+        }
+        dvars.set("ui_frontend_status", reason);
     }
     if dvars.get("ui_mapname").is_none()
-        && let Some(map) = maps.0.iter().find(|map| map.starts_with("iw4:"))
+        && let Some(map) = maps.maps().find(|map| map.starts_with("iw4:"))
     {
         dvars.set("ui_mapname", map.clone());
     }
@@ -129,6 +203,12 @@ pub(crate) fn route(
             "ui_gametype",
             sim::HostGameModeSelection::from_env().token(),
         );
+    }
+    if !state.rules_seeded
+        && let Some(config) = catalog.as_ref().and_then(|c| c.rawfile_text(MATCH_CONFIG))
+    {
+        seed_rules(&mut dvars, config);
+        state.rules_seeded = true;
     }
     for command in events.read() {
         let result = (|| -> Result<(), String> {
@@ -186,6 +266,7 @@ pub(crate) fn route(
                         return Err("Only the lobby host can start a match".into());
                     }
                     let (map, mode) = selected_game(&dvars, &maps)?;
+                    commands.insert_resource(host_rules(&dvars));
                     if state.public {
                         services.submit(net::MasterMenuAction::StartMatch {
                             map,
@@ -204,6 +285,22 @@ pub(crate) fn route(
                 }
                 "ui_vote_skip" => services.submit(net::MasterMenuAction::VoteToSkip)?,
                 "ui_maps" => {
+                    let map = dvars.get("ui_mapname").unwrap_or_default();
+                    state.map_pack = maps.pack_of(map).unwrap_or(0);
+                    let index = pack_maps(&maps, state.map_pack)
+                        .iter()
+                        .position(|installed| installed == map)
+                        .unwrap_or(0);
+                    state.map_page = index / PAGE_SIZE;
+                    state.map_hover = index % PAGE_SIZE;
+                }
+                "ui_map_pack" => {
+                    state.map_pack = command
+                        .args
+                        .first()
+                        .and_then(|arg| arg.parse().ok())
+                        .filter(|pack| *pack < maps.0.len())
+                        .ok_or("Invalid map pack")?;
                     state.map_page = 0;
                     state.map_hover = 0;
                 }
@@ -216,7 +313,8 @@ pub(crate) fn route(
                         .ok_or("Invalid map row")?;
                 }
                 "ui_map_page" => {
-                    change_page(&mut state.map_page, command, maps.0.len());
+                    let len = pack_maps(&maps, state.map_pack).len();
+                    change_page(&mut state.map_page, command, len);
                     state.map_hover = 0;
                 }
                 "ui_select_map" | "ui_select_mode" => {
@@ -232,8 +330,7 @@ pub(crate) fn route(
                             .and_then(|arg| arg.parse::<usize>().ok())
                             .filter(|row| *row < PAGE_SIZE)
                             .ok_or("Invalid map row")?;
-                        map = maps
-                            .0
+                        map = pack_maps(&maps, state.map_pack)
                             .get(state.map_page * PAGE_SIZE + row)
                             .ok_or("Map is unavailable")?
                             .clone();
@@ -374,38 +471,45 @@ pub(crate) fn route(
     );
     let selected_label = map_label(dvars.get("ui_mapname").unwrap_or_default());
     dvars.set("ui_map_label", selected_label);
-    let map = dvars.get("ui_mapname").unwrap_or_default();
-    let (namespace, stem) = map.split_once(':').unwrap_or(("iw4", map));
-    let preview = if stem.is_empty() {
-        String::new()
-    } else {
-        format!("{namespace}:material/preview_{stem}")
-    };
+    let preview = map_preview(dvars.get("ui_mapname").unwrap_or_default());
     dvars.set("ui_lobby_preview", preview);
     let mode_label = dvars
         .get("ui_gametype")
         .and_then(sim::HostGameModeSelection::from_token)
         .map_or("", |mode| mode.display_name());
     dvars.set("ui_mode_label", mode_label);
-    let hovered_map = maps.0.get(state.map_page * PAGE_SIZE + state.map_hover);
+    let pack = pack_maps(&maps, state.map_pack);
+    let hovered_map = pack.get(state.map_page * PAGE_SIZE + state.map_hover);
     dvars.set(
         "ui_map_preview_title",
         hovered_map.map_or_else(String::new, |map| map_label(map)),
     );
     dvars.set(
         "ui_map_preview",
-        hovered_map.map_or_else(String::new, |map| {
-            let (namespace, stem) = map.split_once(':').unwrap_or(("iw4", map));
-            format!("{namespace}:material/preview_{stem}")
-        }),
+        hovered_map.map_or_else(String::new, |map| map_preview(map)),
     );
     for row in 0..PAGE_SIZE {
         dvars.set(
             &format!("ui_map_{row}"),
-            maps.0
-                .get(state.map_page * PAGE_SIZE + row)
+            pack.get(state.map_page * PAGE_SIZE + row)
                 .map(|map| map_label(map))
                 .unwrap_or_default(),
+        );
+    }
+    dvars.set(
+        "ui_map_paged",
+        if pack.len() > PAGE_SIZE { "1" } else { "0" },
+    );
+    for slot in 0..PACK_SLOTS {
+        dvars.set(
+            &format!("ui_map_pack_{slot}"),
+            maps.0
+                .get(slot)
+                .map_or_else(String::new, |pack| pack.label.clone()),
+        );
+        dvars.set(
+            &format!("ui_map_pack_tint_{slot}"),
+            if slot == state.map_pack { "1" } else { "0.45" },
         );
     }
     if let Some(browser) = services.browser.as_ref() {

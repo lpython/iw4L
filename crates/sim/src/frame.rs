@@ -432,6 +432,16 @@ impl FrameWorld<'_> {
         SimState::alive_collision_poses(self, |id| player_ref(self.ecs, id).copied())
     }
 
+    /// `sensor_trace` as of now: players moved, spawned or killed earlier in
+    /// this tick are traced where they are, not where the last record left them.
+    pub(crate) fn current_sensor_trace(
+        &self,
+        query: crate::bullet_collision::BulletTraceQuery,
+    ) -> crate::bullet_collision::TraceOutcome {
+        let moved = self.player_poses_since_record(|id| player_ref(self.ecs, id).copied());
+        self.bullet_trace(query, moved.as_deref())
+    }
+
     pub(crate) fn record_collision_history(
         &mut self,
         tick: Tick,

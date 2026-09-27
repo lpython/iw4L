@@ -156,14 +156,16 @@ pub(super) fn entity_trace(
     mask: u32,
     ignore: TraceIgnore,
 ) -> TraceOutcome {
-    super::presence::settled(world).sensor_trace(crate::bullet_collision::BulletTraceQuery {
-        start,
-        end,
-        mask,
-        ignore: ignore.client,
-        ignore_hit: ignore.other_client,
-        ignore_model: ignore.model,
-    })
+    super::presence::settled(world).current_sensor_trace(
+        crate::bullet_collision::BulletTraceQuery {
+            start,
+            end,
+            mask,
+            ignore: ignore.client,
+            ignore_hit: ignore.other_client,
+            ignore_model: ignore.model,
+        },
+    )
 }
 
 fn surface_name(collider: crate::bullet_collision::ColliderId) -> &'static str {
@@ -852,9 +854,9 @@ pub(super) fn register(registry: &mut NativeRegistry) {
             let id = entity_id(world, receiver)?;
             let source = entity_id(world, arg(args, 0)?)?;
             let mut runtime = runtime(world);
-            let brush = runtime.entities[&source]
-                .brush
-                .ok_or("CloneBrushmodelToScriptmodel source has no brush model")?;
+            let Some(brush) = runtime.entities[&source].brush else {
+                return Ok(Value::Undefined);
+            };
             let origin = match runtime.object_field(id, "origin") {
                 Value::Vector(v) => v,
                 _ => ZERO,

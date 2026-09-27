@@ -597,15 +597,16 @@ pub(crate) fn route(
         })
         .unwrap_or_default();
     dvars.set("ui_class_preview", image);
-    let square_preview = matches!(
-        state.row,
-        Some(
-            ClassEditRow::Perk1
-                | ClassEditRow::Perk2
-                | ClassEditRow::Perk3
-                | ClassEditRow::Deathstreak
-        )
-    );
+    let square_preview = state.attachments
+        || matches!(
+            state.row,
+            Some(
+                ClassEditRow::Perk1
+                    | ClassEditRow::Perk2
+                    | ClassEditRow::Perk3
+                    | ClassEditRow::Deathstreak
+            )
+        );
     dvars.set(
         "ui_class_preview_width",
         if square_preview { "100" } else { "200" },

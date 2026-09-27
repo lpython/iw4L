@@ -53,7 +53,7 @@ arrays/index lvalues, constants, for/foreach/while, switch, conditional expressi
 waits and receiver-bound events. Localized strings and animation literals retain
 separate value types. Values are `Int(i32)` and `Float(f32)`. The operator, cast, truth and
 string-conversion rules are:
-- int/int `/` yields a float.
+- int/int `/` yields a float. Division or `%` by zero yields zero and does not fault.
 - `% & | ^ << >>` accept ints only.
 - A type mismatch in `==` or a comparison is a fault.
 - Only ints and floats have truth.

@@ -785,7 +785,11 @@ pub(super) fn load_field(world: &mut World, client: u32, name: &str) -> Option<V
         "origin" => Value::Vector(ps.map_or([0.0; 3], |ps| ps.origin)),
         "angles" => Value::Vector(ps.map_or([0.0; 3], |ps| ps.viewangles)),
         "health" => Value::Int(ps.map_or(0, |ps| ps.health)),
-        "maxhealth" => Value::Int(ps.map_or(0, |ps| ps.max_health)),
+        "maxhealth" => Value::Int(
+            meta.map(|m| m.max_health)
+                .filter(|&n| n > 0)
+                .unwrap_or(ps.map_or(0, |ps| ps.max_health)),
+        ),
         "name" => Value::String(client_name(&meta?.name).into()),
         "score" => Value::Int(meta?.score),
         "kills" => Value::Int(meta?.kills),
@@ -888,15 +892,19 @@ pub(super) fn store_field(
                 frame.set_viewangles(id, *v);
             }
         }
-        "health" | "maxhealth" => {
+        "health" => {
             let n = int(value)?;
+            if let Some(ps) = FrameWorld::from_world(world).player_mut(id) {
+                ps.health = n;
+            }
+        }
+        "maxhealth" => {
+            let n = int(value)?.max(1);
             let mut frame = FrameWorld::from_world(world);
+            frame.client_meta_mut(id).max_health = n;
             if let Some(ps) = frame.player_mut(id) {
-                if name == "health" {
-                    ps.health = n;
-                } else {
-                    ps.max_health = n;
-                }
+                ps.max_health = n;
+                ps.health = ps.health.min(n);
             }
         }
         "score" | "kills" | "deaths" => {

@@ -32,6 +32,14 @@ pub(crate) fn spawn(
     };
     world.unlink_player_area(id);
     let mut ps = spawn_player_state(origin, angles);
+    if let Some(max) = world
+        .client_meta(id)
+        .map(|m| m.max_health)
+        .filter(|&n| n > 0)
+    {
+        ps.max_health = max;
+        ps.health = max;
+    }
     if let Some(cmd) = world.old_cmd_angles(id) {
         ps.delta_angles = std::array::from_fn(|axis| angles[axis] - cmd[axis] as f32 * SHORT2ANGLE);
     }

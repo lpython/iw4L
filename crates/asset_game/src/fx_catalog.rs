@@ -768,6 +768,21 @@ impl FxDefinitions {
         self.get_in(ns, bind).filter(|d| !d.elems.is_empty())
     }
 
+    pub fn alias_for_map(&mut self, from: &str, to: &str) -> bool {
+        let Some(def) = self.resolve_def_for_map(to) else {
+            return false;
+        };
+        let target_ns = def.namespace;
+        let Some(index) = self.index_in(target_ns, &def.name) else {
+            return false;
+        };
+        let map_ns = body_namespace(self.map_namespace);
+        for ns in [map_ns, target_ns] {
+            self.by_key.insert((ns, ascii_lower(from)), index);
+        }
+        true
+    }
+
     pub fn resolve_def_for_map(&self, name: &str) -> Option<&OwnedFxEffectDef> {
         let map_ns = body_namespace(self.map_namespace);
         self.resolve_def_in(map_ns, name).or_else(|| {

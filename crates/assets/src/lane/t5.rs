@@ -773,7 +773,7 @@ impl ZoneLane for T5Lane {
             fx_models: sink.fx_models,
             report,
             teamsets: sink.teamsets,
-            scripts: sink.scripts,
+            scene_models: sink.scene_models,
             film_visions: std::collections::BTreeMap::new(),
             ..Default::default()
         }

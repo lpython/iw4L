@@ -560,23 +560,13 @@ fn finalize_system(ecs: &mut World) {
     world.enter_kernel_phase(crate::gentity::KernelPhase::Finalize);
     for &(id, cmd) in &input.cmds {
         emit_attack_events(&mut world, tick, &[(id, cmd)]);
-        let Some(meta) = world.client_meta(id) else {
-            continue;
-        };
-        // A dead client keeps its look row: respawn takes delta_angles against it.
-        if meta.lifecycle == ClientLifecycle::Alive {
+        if world.client_meta(id).is_some() {
             world.set_old_cmd(id, cmd.buttons, cmd.angles);
-        } else {
-            world.set_old_cmd_angles(id, cmd.angles);
         }
     }
 
     let mut old_buttons = std::mem::take(world.old_buttons_mut());
-    old_buttons.retain(|(id, _)| {
-        world
-            .client_meta(*id)
-            .is_some_and(|m| m.lifecycle == ClientLifecycle::Alive)
-    });
+    old_buttons.retain(|(id, _)| world.client_meta(*id).is_some());
     *world.old_buttons_mut() = old_buttons;
     let mut old_angles = std::mem::take(world.old_cmd_angles_mut());
     old_angles.retain(|(id, _)| world.client_meta(*id).is_some());

@@ -174,7 +174,7 @@ pub(crate) struct ZoneWalkSink {
     pub compass: crate::MapCompassSource,
 
     pub script_sound: crate::MapScriptSoundSource,
-    pub iw5_map: asset_world::Iw5MapDeclarations,
+    pub iw5_map: asset_world::MapDeclarations,
 
     pub t5_teamset: Option<String>,
 
@@ -554,6 +554,30 @@ impl fastfile_iw5::AssetLinkSink for CommonWalkSink {
                 .capture_iw5(stream, &self.strings_iw5, &self.materials);
             self.world_weapons
                 .capture_iw5(stream, &self.strings_iw5, &self.materials);
+            if let Some(geometry) = stream.latest_xmodel()
+                && let Some(name) = geometry.name.and_then(|p| stream.cstr(p).ok())
+                && (name.starts_with("prop_flag_")
+                    || name.starts_with("com_plasticcase_")
+                    || name == "prop_suitcase_bomb")
+            {
+                let asset = crate::capture_xmodel_skel_iw5(
+                    stream,
+                    &self.strings_iw5,
+                    geometry,
+                    &self.materials,
+                )
+                .map(|skel| {
+                    let skel = std::sync::Arc::new(skel);
+                    self.shared_surfaces
+                        .retain_iw5(stream, geometry, skel.clone());
+                    crate::MapXModelSceneAsset::Iw5(skel)
+                })
+                .unwrap_or(crate::MapXModelSceneAsset::Unavailable {
+                    reason: "IW5 common objective XModel skeleton capture failed",
+                });
+                self.scene_models
+                    .insert(crate::MapXModelAssetKey(name.to_owned()), asset);
+            }
         }
         Ok(())
     }
@@ -681,6 +705,25 @@ impl fastfile_t5::AssetLinkSink for CommonWalkSink {
                 .capture_t5(stream, &self.strings_t5, &self.materials);
             self.projectile_meshes
                 .capture_t5(stream, &self.strings_t5, &self.materials);
+            if let Some(geometry) = stream.latest_xmodel()
+                && let Some(name) = geometry.name.and_then(|p| stream.cstr(p).ok())
+                && (name.starts_with("mp_flag_")
+                    || name.starts_with("mp_supplydrop_")
+                    || name == "prop_suitcase_bomb")
+            {
+                let asset = crate::capture_xmodel_skel_t5(
+                    stream,
+                    &self.strings_t5,
+                    geometry,
+                    &self.materials,
+                )
+                .map(|skel| crate::MapXModelSceneAsset::T5(std::sync::Arc::new(skel)))
+                .unwrap_or(crate::MapXModelSceneAsset::Unavailable {
+                    reason: "T5 common objective XModel skeleton capture failed",
+                });
+                self.scene_models
+                    .insert(crate::MapXModelAssetKey(name.to_owned()), asset);
+            }
         }
         Ok(())
     }

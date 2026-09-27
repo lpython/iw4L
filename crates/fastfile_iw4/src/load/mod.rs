@@ -18,7 +18,7 @@ mod weapon;
 mod world;
 mod xanim;
 
-pub use menu::{MenuDefCapture, MenuItemLayout, MenuRectCapture, MenuScriptKind};
+pub use menu::{MenuChoiceValue, MenuDefCapture, MenuItemLayout, MenuRectCapture, MenuScriptKind};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GlyphCapture {
@@ -287,6 +287,17 @@ pub trait AssetLinkSink {
 
     fn capture_item_text_exp(&mut self, menu: &str, item: &str, dump: &str) -> Result<()> {
         let _ = (menu, item, dump);
+        Ok(())
+    }
+
+    fn capture_item_choice(
+        &mut self,
+        menu: &str,
+        item: &str,
+        label: &str,
+        value: MenuChoiceValue<'_>,
+    ) -> Result<()> {
+        let _ = (menu, item, label, value);
         Ok(())
     }
 

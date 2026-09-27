@@ -279,17 +279,27 @@ impl MapXModelCatalog {
             self.failed += 1;
             return;
         };
+        let Some(name) = geometry.name.and_then(|p| stream.cstr(p).ok()) else {
+            self.failed += 1;
+            return;
+        };
+        let scene_key = MapXModelAssetKey(name.to_owned());
+        let scene_asset = asset_model::capture_xmodel_skel_iw5_with_shared(
+            stream,
+            strings,
+            geometry,
+            materials,
+            &self.shared_surfaces,
+        )
+        .map(|skel| MapXModelSceneAsset::Iw5(std::sync::Arc::new(skel)))
+        .unwrap_or(MapXModelSceneAsset::Unavailable {
+            reason: "IW5 XModel scene skeleton capture failed",
+        });
+        self.scene_assets.insert(scene_key, scene_asset);
         let Ok(mesh) = build_iw5_xmodel_mesh(stream, geometry, Some(materials)) else {
             self.failed += 1;
             return;
         };
-        let scene_key = MapXModelAssetKey(mesh.name.clone());
-        let scene_asset = crate::capture_xmodel_skel_iw5(stream, strings, geometry, materials)
-            .map(|skel| MapXModelSceneAsset::Iw5(std::sync::Arc::new(skel)))
-            .unwrap_or(MapXModelSceneAsset::Unavailable {
-                reason: "IW5 XModel scene skeleton capture failed",
-            });
-        self.scene_assets.insert(scene_key, scene_asset);
         let index = self.meshes.len();
         self.meshes.push(mesh);
         let slot = Ptr {

@@ -129,7 +129,7 @@ fn walk_t5_leftover_materials(
         ));
         return seed;
     }
-    let (leftover_startup, _, _, leftover_startup_report) =
+    let (leftover_startup, _, leftover_startup_report) =
         leftover_walk_t5_startup_materials(progress);
     report.extend(leftover_startup_report);
     let leftover_startup_n = leftover_startup.materials.len();
@@ -154,7 +154,6 @@ fn leftover_walk_t5_startup_materials(
 ) -> (
     MaterialCatalog,
     Vec<crate::CapturedStringTable>,
-    crate::ScriptSources,
     Vec<String>,
 ) {
     let mut report = Vec::new();
@@ -162,18 +161,12 @@ fn leftover_walk_t5_startup_materials(
         Ok(root) => root,
         Err(error) => {
             report.push(format!("t5 leftover startup gfx: {error}"));
-            return (
-                MaterialCatalog::default(),
-                Vec::new(),
-                Default::default(),
-                report,
-            );
+            return (MaterialCatalog::default(), Vec::new(), report);
         }
     };
     const ZONES: [&str; 3] = ["code_post_gfx_mp", "localized_code_post_gfx_mp", "patch_mp"];
     let mut seed = MaterialCatalog::default();
     let mut stats = Vec::new();
-    let mut scripts = crate::ScriptSources::default();
     for zone in ZONES {
         let found = match find_zone_file_version(&root, zone, fastfile_t5::ZONE_VERSION_PC) {
             Ok(found) => found,
@@ -188,13 +181,12 @@ fn leftover_walk_t5_startup_materials(
             stats = population.cac_tables;
         }
         seed = population.materials;
-        scripts.overlay(population.scripts);
     }
     report.push(format!(
         "t5 leftover startup gfx: materials={}",
         seed.materials.len()
     ));
-    (seed, stats, scripts, report)
+    (seed, stats, report)
 }
 
 fn walk_foreign_material_population(
@@ -548,6 +540,8 @@ pub(super) struct Iw5WeaponBundle {
 
     pub(super) materials: MaterialCatalog,
     pub(super) stats_tables: Vec<crate::CapturedStringTable>,
+    pub(super) scene_models: crate::MapXModelSceneCatalog,
+    pub(super) shared_surfaces: asset_model::SharedXModelSurfaces,
 }
 
 pub(super) fn resolve_iw5_weapon_donor(
@@ -614,6 +608,8 @@ pub(super) fn walk_iw5_weapon_bundle(
             xanims: census.xanims,
             materials: census.material_population,
             stats_tables: census.cac_tables,
+            scene_models: census.scene_models,
+            shared_surfaces: census.shared_surfaces,
         },
         pending_images,
         report,
@@ -663,6 +659,15 @@ pub(super) fn walk_shared_iw5_common(
         census.world_weapons.len(),
         census.xanims.len(),
     ));
+    report.push(format!(
+        "iw5 common objective models: {:?} shared surfaces: {:?}",
+        census
+            .scene_models
+            .iter()
+            .map(|(key, _)| key.0.as_str())
+            .collect::<Vec<_>>(),
+        census.shared_surfaces.0.keys().collect::<Vec<_>>(),
+    ));
     (
         materials,
         Iw5WeaponBundle {
@@ -672,6 +677,8 @@ pub(super) fn walk_shared_iw5_common(
             xanims: census.xanims,
             materials: MaterialCatalog::default(),
             stats_tables: census.cac_tables,
+            scene_models: census.scene_models,
+            shared_surfaces: census.shared_surfaces,
         },
         pending_images,
         report,
@@ -685,7 +692,6 @@ pub(super) enum T5CommonPrep {
         opened: Result<std::sync::Arc<crate::ZoneImage>, String>,
         leftover_startup: MaterialCatalog,
         leftover_stats: Vec<crate::CapturedStringTable>,
-        leftover_scripts: crate::ScriptSources,
         report: Vec<String>,
     },
 }
@@ -716,7 +722,7 @@ pub(super) fn t5_weapon_common_prep(
         ));
         return T5CommonPrep::Skip(report);
     }
-    let (leftover_startup, leftover_stats, leftover_scripts, leftover_startup_report) =
+    let (leftover_startup, leftover_stats, leftover_startup_report) =
         leftover_walk_t5_startup_materials(progress);
     report.extend(leftover_startup_report);
     let stage = progress.begin_scoped(StageId::CommonAssets, "t5_weapons", None);
@@ -727,7 +733,6 @@ pub(super) fn t5_weapon_common_prep(
         opened,
         leftover_startup,
         leftover_stats,
-        leftover_scripts,
         report,
     }
 }
@@ -741,7 +746,7 @@ pub(super) struct T5WeaponCommon {
     pub(super) fx: FxCatalog,
     pub(super) projectiles: crate::ProjectileMeshBuild,
     pub(super) teamsets: std::collections::HashMap<String, crate::MapTeamSettings>,
-    pub(super) scripts: crate::ScriptSources,
+    pub(super) scene_models: crate::MapXModelSceneCatalog,
     pub(super) images: Option<PendingImages>,
     pub(super) stats_tables: (
         Vec<crate::CapturedStringTable>,
@@ -761,7 +766,7 @@ impl T5WeaponCommon {
             fx: FxCatalog::default(),
             projectiles: crate::ProjectileMeshBuild::default(),
             teamsets: Default::default(),
-            scripts: Default::default(),
+            scene_models: Default::default(),
             images: None,
             stats_tables: (Vec::new(), Vec::new()),
             report,
@@ -775,24 +780,15 @@ pub(super) fn walk_t5_weapon_common(
     material_seed: MaterialCatalog,
     job: load_jobs::Job,
 ) -> T5WeaponCommon {
-    let (donor, opened, leftover_startup, leftover_stats, leftover_scripts, mut report) = match prep
-    {
+    let (donor, opened, leftover_startup, leftover_stats, mut report) = match prep {
         T5CommonPrep::Skip(report) => return T5WeaponCommon::empty(material_seed, report),
         T5CommonPrep::Ready {
             donor,
             opened,
             leftover_startup,
             leftover_stats,
-            leftover_scripts,
             report,
-        } => (
-            donor,
-            opened,
-            leftover_startup,
-            leftover_stats,
-            leftover_scripts,
-            report,
-        ),
+        } => (donor, opened, leftover_startup, leftover_stats, report),
     };
     let leftover_startup_n = leftover_startup.materials.len();
     let mut material_seed = material_seed;
@@ -836,11 +832,7 @@ pub(super) fn walk_t5_weapon_common(
         fx: census.fx,
         projectiles: census.projectile_meshes,
         teamsets: census.teamsets,
-        scripts: {
-            let mut scripts = census.scripts;
-            scripts.overlay(leftover_scripts);
-            scripts
-        },
+        scene_models: census.scene_models,
         images,
         stats_tables: (leftover_stats, census.cac_tables),
         report,

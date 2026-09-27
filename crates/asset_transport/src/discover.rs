@@ -593,7 +593,22 @@ pub fn games_content_report(root: &GamesRoot) -> Vec<String> {
     report
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct MapPack {
+    pub label: String,
+    pub maps: Vec<String>,
+}
+
 pub fn list_mp_maps(root: &GamesRoot) -> Vec<String> {
+    let mut maps: Vec<String> = list_mp_map_packs(root)
+        .into_iter()
+        .flat_map(|pack| pack.maps)
+        .collect();
+    maps.sort();
+    maps
+}
+
+pub fn list_mp_map_packs(root: &GamesRoot) -> Vec<MapPack> {
     let mut zones = Vec::new();
     for entry in game_files(&root.0) {
         let path = match entry {
@@ -614,25 +629,53 @@ pub fn list_mp_maps(root: &GamesRoot) -> Vec<String> {
             continue;
         }
         if let Some(game) = zone_game_for_path(&path) {
-            zones.push((game.prefix(), stem));
+            zones.push((game.prefix(), stem, map_pack_folder(&path)));
         }
     }
-    let loads: std::collections::HashSet<(&str, &str)> = zones
+    let loads: HashSet<(&str, &str)> = zones
         .iter()
-        .filter_map(|(game, stem)| stem.strip_suffix("_load").map(|map| (*game, map)))
+        .filter_map(|(game, stem, _)| stem.strip_suffix("_load").map(|map| (*game, map)))
         .collect();
-    let mut maps: Vec<String> = zones
-        .iter()
-        .filter(|(game, stem)| {
-            !stem.ends_with("_load")
-                && (loads.contains(&(*game, stem.as_str()))
-                    || !loads.iter().any(|(g, _)| g == game))
+    let mut packs: BTreeMap<(&str, &str), Vec<String>> = BTreeMap::new();
+    let mut seen = HashSet::new();
+    for (game, stem, folder) in &zones {
+        if stem.ends_with("_load")
+            || !(loads.contains(&(*game, stem.as_str())) || !loads.iter().any(|(g, _)| g == game))
+        {
+            continue;
+        }
+        let map = format!("{game}:{stem}");
+        if seen.insert(map.clone()) {
+            packs.entry((game, folder)).or_default().push(map);
+        }
+    }
+    packs
+        .into_iter()
+        .map(|((game, folder), mut maps)| {
+            maps.sort();
+            MapPack {
+                label: format!("{} {folder}", game.to_ascii_uppercase()),
+                maps,
+            }
         })
-        .map(|(game, stem)| format!("{game}:{stem}"))
-        .collect();
-    maps.sort();
-    maps.dedup();
-    maps
+        .collect()
+}
+
+fn map_pack_folder(zone_ff: &Path) -> String {
+    game_root_for_zone(zone_ff)
+        .ok()
+        .and_then(|tree| {
+            zone_ff
+                .strip_prefix(tree.join("zone"))
+                .ok()?
+                .components()
+                .next()?
+                .as_os_str()
+                .to_str()
+                .map(str::to_ascii_uppercase)
+        })
+        .filter(|folder| folder.starts_with("DLC"))
+        .unwrap_or_else(|| "BASE".to_owned())
 }
 
 pub fn ensure_artifacts_dir() -> Result<PathBuf, String> {

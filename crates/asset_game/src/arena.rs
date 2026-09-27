@@ -23,6 +23,110 @@ pub struct MapTeamSettings {
     pub defenders: Option<String>,
     pub allies: Option<asset_core::AssetKey>,
     pub axis: Option<asset_core::AssetKey>,
+    pub allies_charset: Option<String>,
+    pub axis_charset: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ObjectiveVisuals {
+    pub neutral_flag: Option<String>,
+    pub bomb: Option<String>,
+    pub flag: [Option<String>; 2],
+    pub flag_carry: [Option<String>; 2],
+    pub flag_base_fx: [Option<String>; 2],
+    pub crate_model: [Option<String>; 2],
+    pub crate_overlay: [Option<String>; 2],
+}
+
+impl ObjectiveVisuals {
+    #[must_use]
+    pub fn from_faction_table(
+        table: &CapturedStringTable,
+        allieschar: Option<&str>,
+        axischar: Option<&str>,
+    ) -> Self {
+        let cell = |charset: Option<&str>, column| {
+            let charset = charset.filter(|s| !s.is_empty())?;
+            let value = table.lookup_col(charset, column);
+            (!value.is_empty()).then(|| value.to_owned())
+        };
+        let pair = |column| [cell(allieschar, column), cell(axischar, column)];
+        Self {
+            neutral_flag: Some("prop_flag_neutral".to_owned()),
+            bomb: Some("prop_suitcase_bomb".to_owned()),
+            flag: pair(10),
+            flag_carry: pair(11),
+            flag_base_fx: pair(13),
+            crate_model: pair(18),
+            crate_overlay: [
+                Some("com_plasticcase_friendly".to_owned()),
+                Some("com_plasticcase_enemy".to_owned()),
+            ],
+        }
+    }
+
+    #[must_use]
+    pub fn t5(allies: Option<&str>, axis: Option<&str>) -> Self {
+        let allies_flag = match allies {
+            Some("marines") => "mp_flag_allies_1",
+            Some("rebels") => "mp_flag_allies_3",
+            _ => "mp_flag_allies_2",
+        };
+        let axis_flag = match axis {
+            Some("russian") => "mp_flag_axis_1",
+            Some("tropas") => "mp_flag_axis_3",
+            _ => "mp_flag_axis_2",
+        };
+        let crates = [
+            Some("mp_supplydrop_ally".to_owned()),
+            Some("mp_supplydrop_axis".to_owned()),
+        ];
+        Self {
+            neutral_flag: Some("mp_flag_neutral".to_owned()),
+            bomb: Some("prop_suitcase_bomb".to_owned()),
+            flag: [Some(allies_flag.to_owned()), Some(axis_flag.to_owned())],
+            flag_carry: [
+                Some(format!("{allies_flag}_carry")),
+                Some(format!("{axis_flag}_carry")),
+            ],
+            flag_base_fx: std::array::from_fn(|_| Some("misc/fx_ui_flagbase_gold_t5".to_owned())),
+            crate_model: crates.clone(),
+            crate_overlay: crates,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        *self == Self::default()
+    }
+
+    pub fn model_groups<'a>(&'a self, other: &'a Self) -> Vec<Vec<(&'a str, &'a str)>> {
+        let slots = |v: &'a Self| -> [Vec<&'a Option<String>>; 5] {
+            [
+                vec![&v.neutral_flag],
+                vec![&v.bomb],
+                vec![&v.flag[0], &v.flag_carry[0]],
+                vec![&v.flag[1], &v.flag_carry[1]],
+                v.crate_model.iter().chain(&v.crate_overlay).collect(),
+            ]
+        };
+        slots(self)
+            .into_iter()
+            .zip(slots(other))
+            .map(|(a, b)| {
+                a.into_iter()
+                    .zip(b)
+                    .filter_map(|(a, b)| Some((a.as_deref()?, b.as_deref()?)))
+                    .collect()
+            })
+            .collect()
+    }
+
+    pub fn fx_pairs<'a>(&'a self, other: &'a Self) -> impl Iterator<Item = (&'a str, &'a str)> {
+        self.flag_base_fx
+            .iter()
+            .zip(&other.flag_base_fx)
+            .filter_map(|(a, b)| Some((a.as_deref()?, b.as_deref()?)))
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Resource)]
@@ -71,6 +175,8 @@ pub fn team_settings(
             )
             .ok()
         }),
+        allies_charset: allieschar.map(str::to_owned),
+        axis_charset: axischar.map(str::to_owned),
         ..Default::default()
     }
 }
@@ -415,6 +521,8 @@ pub fn t5_settings_from_teamset_gsc(script: &str) -> MapTeamSettings {
             )
             .ok()
         }),
+        allies_charset: asset_audio::game_string_assignment(script, "allies").map(str::to_owned),
+        axis_charset: asset_audio::game_string_assignment(script, "axis").map(str::to_owned),
     }
 }
 

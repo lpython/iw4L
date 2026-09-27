@@ -592,10 +592,7 @@ pub(super) fn binary(op: Binary, a: Value, b: Value) -> Result<Value, String> {
         }
         Binary::Mod => {
             let (x, y) = integers(&a, &b)?;
-            if y == 0 {
-                return Err("divide by 0".into());
-            }
-            Value::Int(x.wrapping_rem(y))
+            Value::Int(x.checked_rem(y).unwrap_or(0))
         }
         Binary::Equal => Value::Int(i32::from(equality(a, b)?)),
         Binary::NotEqual => Value::Int(i32::from(!equality(a, b)?)),
@@ -638,8 +635,10 @@ pub(super) fn binary(op: Binary, a: Value, b: Value) -> Result<Value, String> {
             match (&a, &b, op) {
                 (Value::Int(x), Value::Int(y), Binary::Sub) => Value::Int(x.wrapping_sub(*y)),
                 (Value::Int(x), Value::Int(y), Binary::Mul) => Value::Int(x.wrapping_mul(*y)),
+                // The stock scripts divide by a zero they never guard (a caps-per-minute
+                // rate read before the first second is counted) and read the zero back.
                 (Value::Int(_), Value::Int(0), _) | (_, Value::Float(0.0), Binary::Div) => {
-                    return Err("divide by 0".into());
+                    Value::Float(0.0)
                 }
                 (Value::Int(x), Value::Int(y), _) => Value::Float(*x as f32 / *y as f32),
                 (Value::Float(x), Value::Float(y), Binary::Sub) => Value::Float(x - y),
@@ -652,7 +651,7 @@ pub(super) fn binary(op: Binary, a: Value, b: Value) -> Result<Value, String> {
                     Value::Vector([x[0] * y[0], x[1] * y[1], x[2] * y[2]])
                 }
                 (Value::Vector(_), Value::Vector(y), _) if y.contains(&0.0) => {
-                    return Err("divide by 0".into());
+                    Value::Vector([0.0; 3])
                 }
                 (Value::Vector(x), Value::Vector(y), _) => {
                     Value::Vector([x[0] / y[0], x[1] / y[1], x[2] / y[2]])

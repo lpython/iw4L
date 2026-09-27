@@ -207,7 +207,6 @@ pub(crate) fn sync_engine_events(world: &mut World) {
     settle_projectiles(world, &notes);
     settle_items(world);
     super::vehicles::advance(world);
-    super::physics::advance(world);
     super::players::publish_radar(world);
     super::physics::select_usables(world);
 }

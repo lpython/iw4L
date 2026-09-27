@@ -180,10 +180,11 @@ pub use animtree::{
     PLAYERANIM_SCRIPT_PATH, PLAYERANIM_TYPES_PATH, PlayerAnimLeafBinds, PlayerAnimSources,
 };
 pub use arena::{
-    ArenaCharsets, FACTION_ICON_COL, MapTeamSettings, SessionTeamSettings, arena_charsets,
-    arena_entry, load_iw5_team_sources, parse_arena, read_basemaps_arena, read_iwd_named,
-    t5_settings_from_teamset_gsc, t5_settings_from_teamset_rawfile, t5_teamset_from_map_gsc,
-    t5_teamset_from_rawfile, t5_teamset_key_from_rawfile, team_settings, team_settings_for_zone,
+    ArenaCharsets, FACTION_ICON_COL, MapTeamSettings, ObjectiveVisuals, SessionTeamSettings,
+    arena_charsets, arena_entry, load_iw5_team_sources, parse_arena, read_basemaps_arena,
+    read_iwd_named, t5_settings_from_teamset_gsc, t5_settings_from_teamset_rawfile,
+    t5_teamset_from_map_gsc, t5_teamset_from_rawfile, t5_teamset_key_from_rawfile, team_settings,
+    team_settings_for_zone,
 };
 pub use artifact_cache::{cache_flight, cache_get, cache_put, fnv1a64, fnv1a64_more};
 pub use asset_core::{
@@ -245,11 +246,12 @@ pub use createfx::{
     parse_createfx_effect_aliases, parse_createfx_loop_sounds, parse_createfx_oneshots,
 };
 pub use discover::{
-    GamesRoot, ZoneFile, ensure_artifacts_dir, find_common_mp_for_envelope,
+    GamesRoot, MapPack, ZoneFile, ensure_artifacts_dir, find_common_mp_for_envelope,
     find_common_mp_for_zone, find_localized_common_mp_for_zone, find_runtime_common_mp,
     find_runtime_zone, find_zone_file, find_zone_file_version, find_zone_for_tree,
-    games_content_report, games_root_from_env, games_root_report, group_mp_maps, list_mp_maps,
-    load_dotenv, map_load_title, peek_zone_version, split_zone_key, zone_game_for_path,
+    games_content_report, games_root_from_env, games_root_report, group_mp_maps, list_mp_map_packs,
+    list_mp_maps, load_dotenv, map_load_title, peek_zone_version, split_zone_key,
+    zone_game_for_path,
 };
 pub use dobj::{
     AIM_PITCH_CLAMP_RAD, AnimInstance, Attach, DObj, DObjError, ModelPoseSrc, TP_HEAD_ATTACH_TAG,
@@ -521,4 +523,4 @@ pub use asset_material::{material_alpha_test, t5_smodel_camera_emits};
 pub mod image_handles;
 
 mod script_sources;
-pub use script_sources::{ScriptSources, ScriptTable, rules_namespace};
+pub use script_sources::{ScriptSources, ScriptTable};

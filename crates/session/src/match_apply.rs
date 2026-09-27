@@ -259,6 +259,7 @@ pub fn apply_prepared_match(
     presentation: MatchInstallPresentation,
     occupancy: MatchInstallOccupancy,
     mode_selection: Option<Res<sim::HostGameModeSelection>>,
+    rules: Option<Res<frame::HostMatchRules>>,
     mut failed: MessageWriter<frame::MapLoadFailed>,
 ) {
     let PreparedMatchSource {
@@ -362,6 +363,7 @@ pub fn apply_prepared_match(
         prepared,
         &zone,
         mode_selection.as_deref(),
+        rules.as_deref(),
         catalog.as_deref(),
         identity.as_deref(),
     ) {
@@ -865,6 +867,12 @@ fn config_sets(text: &str) -> Vec<(String, String)> {
         .collect()
 }
 
+fn script_dvar_overrides() -> Vec<(String, String)> {
+    std::env::var("IW4L_SCRIPT_DVARS")
+        .map(|text| config_sets(&text.replace(';', "\n")))
+        .unwrap_or_default()
+}
+
 fn script_refusal(
     zone: &str,
     gametype: &str,
@@ -884,6 +892,7 @@ fn preflight_match_install(
     mut prepared: assets::PreparedMatch,
     zone: &str,
     mode_selection: Option<&sim::HostGameModeSelection>,
+    rules: Option<&frame::HostMatchRules>,
     catalog: Option<&assets::MenuCatalog>,
     identity: Option<&LaunchIdentity>,
 ) -> Result<MatchInstallPlan, InstallRefusal> {
@@ -911,6 +920,53 @@ fn preflight_match_install(
             assets::AssetNamespace::Iw4,
             arena.as_deref(),
             zone,
+        );
+    }
+    if prepared_map.namespace != Some(assets::AssetNamespace::Iw4)
+        && !prepared_map.facts.objective_visuals.is_empty()
+        && let Some(catalog) = catalog
+        && let Some(table) = catalog.string_table(gamemode_iw4::FACTION_TABLE)
+    {
+        let (allies, axis) = iw4_charsets(catalog, identity, zone);
+        let iw4 = assets::ObjectiveVisuals::from_faction_table(table, Some(&allies), Some(&axis));
+        let realm = &prepared_map.facts.objective_visuals;
+        let scene = &mut prepared.world.map_xmodel_scene_assets;
+        let mut served = Vec::new();
+        let mut missing = Vec::new();
+        for group in iw4.model_groups(realm) {
+            let absent: Vec<&str> = group
+                .iter()
+                .map(|&(_, to)| to)
+                .filter(|to| {
+                    !matches!(
+                        scene.get_name(to),
+                        Some(
+                            assets::MapXModelSceneAsset::Iw4(_)
+                                | assets::MapXModelSceneAsset::Iw5(_)
+                                | assets::MapXModelSceneAsset::T5(_)
+                        )
+                    )
+                })
+                .collect();
+            if !absent.is_empty() {
+                missing.extend(absent);
+                continue;
+            }
+            for (from, to) in group.into_iter().filter(|(from, to)| from != to) {
+                if scene.alias(from, to) {
+                    served.push(format!("{from}->{to}"));
+                }
+            }
+        }
+        for (from, to) in iw4.fx_pairs(realm).filter(|(from, to)| from != to) {
+            match prepared.fx.alias_for_map(from, to) {
+                true => served.push(format!("{from}->{to}")),
+                false => missing.push(to),
+            }
+        }
+        diag::info!(
+            World,
+            "objective visuals from the map's game: served={served:?} missing={missing:?}"
         );
     }
     let strings = std::mem::take(&mut prepared.strings);
@@ -962,31 +1018,20 @@ fn preflight_match_install(
     };
     let startup = sim::gsc_ir::Iw4Startup::new(&sources, gametype, zone);
     let roots: Vec<&str> = startup.roots.iter().map(String::as_str).collect();
-    let builtins = match assets::rules_namespace(prepared_map.namespace) {
-        assets::AssetNamespace::T5 => sim::gsc_ir::Catalog::t5(),
-        _ => sim::gsc_ir::Catalog::iw4(),
-    };
-    let scripts = sim::gsc_ir::Program::load(&sources, &roots, &builtins)
+    let scripts = sim::gsc_ir::Program::load(&sources, &roots, &sim::gsc_ir::Catalog::iw4())
         .map_err(|e| script_refusal(zone, gametype, "compile", &e))?;
-    let iw4_map = prepared_map.namespace == Some(assets::AssetNamespace::Iw4);
     let config = sources
         .0
         .config(MATCH_CONFIG)
-        .or_else(|| {
-            catalog
-                .filter(|_| iw4_map)
-                .and_then(|c| c.rawfile_text(MATCH_CONFIG))
-        })
+        .or_else(|| catalog.and_then(|c| c.rawfile_text(MATCH_CONFIG)))
         .map(str::to_owned)
         .or_else(|| {
             identity
-                .filter(|_| iw4_map)
                 .and_then(|id| assets::read_iwd_named(&id.games_root, MATCH_CONFIG))
                 .and_then(|bytes| String::from_utf8(bytes).ok())
         });
     let mut script_dvars = match config {
         Some(text) => config_sets(&text),
-        None if !iw4_map => Vec::new(),
         None => {
             diag::warn!(
                 Sim,
@@ -997,6 +1042,23 @@ fn preflight_match_install(
     };
     script_dvars.push(("mapname".into(), zone.to_owned()));
     script_dvars.push(("g_gametype".into(), gametype.to_owned()));
+    for (name, value) in rules.map_or(&[][..], |rules| &rules.0) {
+        match script_dvars
+            .iter_mut()
+            .find(|(set, _)| set.eq_ignore_ascii_case(name))
+        {
+            Some((_, set)) => set.clone_from(value),
+            None => script_dvars.push((name.clone(), value.clone())),
+        }
+    }
+    if let Some(rules) = rules {
+        diag::info!(
+            Sim,
+            "gsc: {} host rule dvars over {MATCH_CONFIG}",
+            rules.0.len()
+        );
+    }
+    script_dvars.extend(script_dvar_overrides());
     let script_entries = startup.entries;
     let authority_models = authority_entity_model_install(&prepared.world);
     let model_spawns = script_model_spawns(&prepared.world.script_model_instances);
@@ -1601,6 +1663,33 @@ fn install_shocks(
     world.set_shocks(shocks);
 }
 
+fn charsets(arena_text: Option<&str>, zone: &str) -> (String, String) {
+    let row = arena_text.and_then(|text| assets::arena_charsets(text, zone));
+    let allies = row
+        .as_ref()
+        .and_then(|r| r.allieschar.clone())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| gamemode_iw4::DEFAULT_ALLIES_CHARSET.to_owned());
+    let axis = row
+        .as_ref()
+        .and_then(|r| r.axischar.clone())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| gamemode_iw4::DEFAULT_AXIS_CHARSET.to_owned());
+    (allies, axis)
+}
+
+fn iw4_charsets(
+    catalog: &assets::MenuCatalog,
+    identity: Option<&LaunchIdentity>,
+    zone: &str,
+) -> (String, String) {
+    let arena_text = catalog
+        .rawfile_text("mp/basemaps.arena")
+        .map(str::to_owned)
+        .or_else(|| identity.and_then(|id| assets::read_basemaps_arena(&id.games_root)));
+    charsets(arena_text.as_deref(), zone)
+}
+
 fn install_team_voice_prefixes(
     world: &mut sim::SimContentBuilder,
     catalog: Option<&assets::MenuCatalog>,
@@ -1623,19 +1712,7 @@ fn install_team_voice_prefixes(
     {
         world.set_map_custom(entry);
     }
-    let row = arena_text
-        .as_deref()
-        .and_then(|text| assets::arena_charsets(text, zone));
-    let allies_cs = row
-        .as_ref()
-        .and_then(|r| r.allieschar.clone())
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| gamemode_iw4::DEFAULT_ALLIES_CHARSET.to_owned());
-    let axis_cs = row
-        .as_ref()
-        .and_then(|r| r.axischar.clone())
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| gamemode_iw4::DEFAULT_AXIS_CHARSET.to_owned());
+    let (allies_cs, axis_cs) = charsets(arena_text.as_deref(), zone);
     let allies = table.lookup_col(&allies_cs, gamemode_iw4::FACTION_VOICE_PREFIX_COL);
     let axis = table.lookup_col(&axis_cs, gamemode_iw4::FACTION_VOICE_PREFIX_COL);
     world.set_team_voice_prefixes(

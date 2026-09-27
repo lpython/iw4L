@@ -39,8 +39,15 @@ pub struct MenuDefCapture<'a> {
     pub expr_dvars: &'a str,
     pub fullscreen: i32,
     pub item_count: i32,
+    pub focus_color: [f32; 4],
 
     pub rect: MenuRectCapture,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum MenuChoiceValue<'a> {
+    Str(&'a str),
+    Float(f32),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -280,6 +287,7 @@ pub(super) fn load_menu(s: &mut ZoneStream<'_>, links: &mut dyn AssetLinkSink) -
         expr_dvars,
         fullscreen,
         item_count: item_count as i32,
+        focus_color: read_vec4(s, p, s.layout(240, 292)).unwrap_or([1.0; 4]),
         rect,
     })?;
     if !vis_dump.is_empty() {
@@ -1183,11 +1191,25 @@ fn load_item_type_data(
     } else if item_type == ITEM_TYPE_MULTI {
         if s.begin_body(p.at(0))? {
             let m = s.alloc_load(4, s.layout(sz::MULTI_DEF, 648))?;
+            let labels = 0;
+            let strings = s.layout(128, 256);
             for i in 0..32 {
-                s.follow_string(m, i * s.pointer_bytes())?;
+                s.follow_string(m, labels + i * s.pointer_bytes())?;
             }
             for i in 0..32 {
-                s.follow_string(m, s.layout(128, 256) + i * s.pointer_bytes())?;
+                s.follow_string(m, strings + i * s.pointer_bytes())?;
+            }
+            let floats = s.layout(256, 512);
+            let count = s.i32_at(m, s.layout(384, 640))?.clamp(0, 32) as usize;
+            let string_values = s.i32_at(m, s.layout(388, 644))? != 0;
+            for i in 0..count {
+                let label = string_at(s, m, labels + i * s.pointer_bytes());
+                let value = if string_values {
+                    MenuChoiceValue::Str(string_at(s, m, strings + i * s.pointer_bytes()))
+                } else {
+                    MenuChoiceValue::Float(s.f32_at(m, floats + i * 4)?)
+                };
+                links.capture_item_choice(menu, item, label, value)?;
             }
         }
     } else if item_type == ITEM_TYPE_DVARENUM {

@@ -56,7 +56,7 @@ pub(super) async fn walk_prepared_match(
     let cloning = std::time::Instant::now();
     let CommonProducts {
         scripts: iw4_scripts,
-        t5_scripts,
+        t5_scene_models,
         material_seed,
         shared_surfaces,
         scene_models: common_scene_models,
@@ -81,6 +81,8 @@ pub(super) async fn walk_prepared_match(
         t5_xanims,
         t5_fx,
         iw5_materials,
+        mut iw5_scene_models,
+        iw5_shared_surfaces,
         strings,
         counts:
             CommonCounts {
@@ -127,6 +129,10 @@ pub(super) async fn walk_prepared_match(
     let (loaded, map_namespace) = match opened_map {
         Ok((path, image)) => {
             let game = image.game;
+            let shared_surfaces = match game {
+                crate::ZoneGame::Iw5 => iw5_shared_surfaces,
+                _ => shared_surfaces,
+            };
             (
                 lane(game).load_world(
                     &path,
@@ -168,18 +174,6 @@ pub(super) async fn walk_prepared_match(
         mut report,
         gaps,
     } = loaded;
-    let mut scripts = match crate::rules_namespace(map_namespace) {
-        crate::AssetNamespace::T5 => t5_scripts,
-        _ => iw4_scripts,
-    };
-    scripts.overlay(map_scripts);
-    report.push(format!(
-        "GSC source assets: {} (map overrides common_mp)",
-        scripts.len()
-    ));
-    world
-        .map_xmodel_scene_assets
-        .absorb_captured(common_scene_models);
     report.append(&mut common_report);
 
     if facts.team_settings.allies.is_none() && facts.team_settings.axis.is_none() {
@@ -199,6 +193,12 @@ pub(super) async fn walk_prepared_match(
             .defenders
             .or_else(|| facts.team_settings.defenders.clone());
     }
+    if map_namespace == Some(crate::AssetNamespace::T5) {
+        facts.objective_visuals = crate::ObjectiveVisuals::t5(
+            facts.team_settings.allies_charset.as_deref(),
+            facts.team_settings.axis_charset.as_deref(),
+        );
+    }
     match (
         facts.t5_teamset.as_deref(),
         facts.team_settings.allies.as_ref(),
@@ -214,6 +214,23 @@ pub(super) async fn walk_prepared_match(
         }
         _ => {}
     }
+
+    let map_scripts = match map_namespace {
+        Some(crate::AssetNamespace::T5) => {
+            let scripts = t5_map_under_iw4_rules(&map_scripts, &zone_name, &facts);
+            report.push(format!(
+                "map script: maps/mp/{zone_name} written from the T5 map's declarations; T5 map scripts left out"
+            ));
+            scripts
+        }
+        _ => map_scripts,
+    };
+    let mut scripts = iw4_scripts;
+    scripts.overlay(map_scripts);
+    report.push(format!(
+        "GSC source assets: {} (map overrides common_mp)",
+        scripts.len()
+    ));
 
     report.push(format!(
         "map teams: allies={:?} axis={:?} attackers={:?} defenders={:?}",
@@ -365,9 +382,23 @@ pub(super) async fn walk_prepared_match(
     let map_new = pool_mat.saturating_sub(seed_mat);
 
     let mut global = materials;
-    let provisional_map_ids: Vec<usize> = (0..global.materials.len()).collect();
-
     let iw5_linked = global.absorb_asset_population_host_materials_win(iw5_materials);
+    let provisional_map_ids: Vec<usize> = (0..global.materials.len()).collect();
+    if iw5_mat_n > 0 {
+        iw5_scene_models.remap_walk_materials(&iw5_linked);
+    }
+    match map_namespace {
+        Some(crate::AssetNamespace::T5) => world
+            .map_xmodel_scene_assets
+            .absorb_captured(t5_scene_models),
+        Some(crate::AssetNamespace::Iw5) => world
+            .map_xmodel_scene_assets
+            .absorb_captured(iw5_scene_models),
+        _ => {}
+    }
+    world
+        .map_xmodel_scene_assets
+        .absorb_captured(common_scene_models);
     report.push(format!(
         "iw5 leftover materials: donor={iw5_mat_n} linked={} pool={}",
         iw5_linked.len(),
@@ -1062,4 +1093,30 @@ pub(super) async fn walk_prepared_match(
         sound,
     };
     (MatchLoadOutcome::Ready(prepared), Some(common))
+}
+
+fn t5_map_under_iw4_rules(
+    map_scripts: &crate::ScriptSources,
+    zone_name: &str,
+    facts: &crate::MapFacts,
+) -> crate::ScriptSources {
+    let module = format!("maps/mp/{zone_name}");
+    let main = map_scripts
+        .read(&module)
+        .ok()
+        .and_then(|bytes| String::from_utf8(bytes).ok())
+        .unwrap_or_default();
+    let mut declarations = asset_world::MapDeclarations::from_t5_map_main(&main);
+    declarations.set_teams(
+        facts.script_sound.attackers.as_deref().unwrap_or("allies"),
+        facts.script_sound.defenders.as_deref().unwrap_or("axis"),
+    );
+    let entities = map_scripts
+        .entities()
+        .map(asset_world::t5_entities_for_iw4_rules)
+        .unwrap_or_default();
+    let mut scripts = crate::ScriptSources::default();
+    scripts.insert_source(&module, declarations.map_script(&entities));
+    scripts.set_entities(entities);
+    scripts
 }

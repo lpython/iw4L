@@ -1936,12 +1936,45 @@ impl SimState {
         &self,
         player: impl Fn(ClientId) -> Option<PlayerState>,
     ) -> Vec<crate::bullet_collision::PlayerCollisionPose> {
-        self.alive_collision_poses_inner(player, |_| {})
+        self.alive_collision_poses_inner(player, &[], |_| {})
+    }
+
+    pub(crate) fn player_poses_since_record(
+        &self,
+        player: impl Fn(ClientId) -> Option<PlayerState>,
+    ) -> Option<Vec<crate::bullet_collision::PlayerCollisionPose>> {
+        use crate::match_state::ClientLifecycle;
+
+        let recorded = self
+            .collision_history
+            .latest_poses()
+            .map_or(&[][..], |(_, poses)| poses);
+        let mut alive = 0;
+        for (id, meta) in &self.clients {
+            if meta.lifecycle != ClientLifecycle::Alive {
+                continue;
+            }
+            let Some(ps) = player(*id) else {
+                continue;
+            };
+            alive += 1;
+            let held = recorded.iter().any(|pose| {
+                pose.client == *id
+                    && pose.life_sequence == meta.life_sequence
+                    && pose.origin == ps.origin
+            });
+            if !held {
+                return Some(self.alive_collision_poses_inner(player, recorded, |_| {}));
+            }
+        }
+        (alive + self.prediction_remote_bodies.len() != recorded.len())
+            .then(|| self.alive_collision_poses_inner(player, recorded, |_| {}))
     }
 
     fn alive_collision_poses_inner(
         &self,
         player: impl Fn(ClientId) -> Option<PlayerState>,
+        reuse: &[crate::bullet_collision::PlayerCollisionPose],
         mut on_err: impl FnMut(&str),
     ) -> Vec<crate::bullet_collision::PlayerCollisionPose> {
         use crate::bullet_collision::{
@@ -1957,6 +1990,14 @@ impl SimState {
             let Some(ps) = player(*id) else {
                 continue;
             };
+            if let Some(pose) = reuse.iter().find(|pose| {
+                pose.client == *id
+                    && pose.life_sequence == meta.life_sequence
+                    && pose.origin == ps.origin
+            }) {
+                poses.push(pose.clone());
+                continue;
+            }
             let bones = match self.player_hitvol_bones(*id, &ps) {
                 Ok(bones) => bones,
                 Err(error) => {
@@ -2254,7 +2295,7 @@ impl SimState {
         self.tick_player_dobjs(hitbox_cmds);
         self.tick_player_anim_trees(msec, player, hitbox_cmds);
         let mut error = None;
-        let poses = self.alive_collision_poses_inner(player, |e| {
+        let poses = self.alive_collision_poses_inner(player, &[], |e| {
             if error.is_none() {
                 error = Some(e.to_owned());
             }

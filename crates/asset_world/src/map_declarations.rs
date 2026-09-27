@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 
 #[derive(Clone, Debug, Default)]
-pub struct Iw5MapDeclarations {
+pub struct MapDeclarations {
     compass: Option<String>,
     teams: Option<(String, String)>,
     preanims: BTreeSet<String>,
@@ -10,7 +10,7 @@ pub struct Iw5MapDeclarations {
     props: Vec<(String, String)>,
 }
 
-impl Iw5MapDeclarations {
+impl MapDeclarations {
     pub fn capture(&mut self, name: &str, compressed_stack: &[u8]) {
         let Ok(stack) = asset_transport::inflate_zlib(compressed_stack) else {
             return;
@@ -23,6 +23,23 @@ impl Iw5MapDeclarations {
         } else if !name.contains('/') {
             self.capture_destructible_anims(&literals);
         }
+    }
+
+    pub fn from_t5_map_main(source: &str) -> Self {
+        let compass = source
+            .split("setupMiniMap")
+            .skip(1)
+            .filter_map(|call| call.split('"').nth(1))
+            .find(|name| name.starts_with("compass_map_") && !name.ends_with("_wager"))
+            .map(str::to_owned);
+        Self {
+            compass,
+            ..Self::default()
+        }
+    }
+
+    pub fn set_teams(&mut self, attackers: &str, defenders: &str) {
+        self.teams = Some((attackers.to_owned(), defenders.to_owned()));
     }
 
     fn capture_map_main(&mut self, literals: &[String]) {

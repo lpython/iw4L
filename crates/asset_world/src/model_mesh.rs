@@ -441,6 +441,25 @@ impl MapXModelSceneCatalog {
         self.assets.entry(key).or_insert(asset);
     }
 
+    pub fn remap_walk_materials(&mut self, donor_to_host: &[usize]) {
+        for asset in self.assets.values_mut() {
+            let (MapXModelSceneAsset::Iw4(skel)
+            | MapXModelSceneAsset::T5(skel)
+            | MapXModelSceneAsset::Iw5(skel)) = asset
+            else {
+                continue;
+            };
+            let skel = Arc::make_mut(skel);
+            for slot in &mut skel.surface_materials {
+                *slot = slot.and_then(|local| {
+                    donor_to_host
+                        .get(local.get())
+                        .map(|&host| asset_core::WalkLocalMaterialIndex::from_walk(host))
+                });
+            }
+        }
+    }
+
     pub fn absorb_captured(&mut self, mut earlier: Self) {
         for (index, key) in earlier.order.into_iter().enumerate() {
             let asset = earlier
@@ -470,6 +489,31 @@ impl MapXModelSceneCatalog {
 
     pub fn set_capture_zone(&mut self, zone: ZoneOwner) {
         self.capture_zone = zone;
+    }
+
+    pub fn alias(&mut self, from: &str, to: &str) -> bool {
+        let Some(asset) = self
+            .assets
+            .get(to)
+            .filter(|asset| !matches!(asset, MapXModelSceneAsset::Unavailable { .. }))
+            .cloned()
+        else {
+            return false;
+        };
+        let zone = self
+            .index_by_name(to)
+            .map(|index| self.zone_of(index))
+            .unwrap_or_default();
+        let key = MapXModelAssetKey(from.to_owned());
+        match self.order.iter().position(|k| k == &key) {
+            Some(slot) => self.zones[slot] = zone,
+            None => {
+                self.order.push(key.clone());
+                self.zones.push(zone);
+            }
+        }
+        self.assets.insert(key, asset);
+        true
     }
 
     pub fn zone_of(&self, index: usize) -> ZoneOwner {

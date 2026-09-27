@@ -45,6 +45,8 @@ pub struct MapFacts {
     pub team_settings: crate::MapTeamSettings,
 
     pub t5_teamset: Option<String>,
+
+    pub objective_visuals: crate::ObjectiveVisuals,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]

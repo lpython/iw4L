@@ -480,11 +480,11 @@
       "float_exp": [
         [
           1,
-          "48"
+          "38"
         ],
         [
           3,
-          "104"
+          "124"
         ]
       ],
       "handlers": {
@@ -532,8 +532,15 @@
       {
         "index": 21,
         "fields": {
+          "disabled_exp": "0"
+        }
+      },
+      {
+        "index": 22,
+        "fields": {
           "text_key": "",
           "text_exp": "op 38 s:75695f6c6f6262795f70726976616379 op 1",
+          "vis_exp": "1",
           "disabled_exp": "0",
           "handlers": {
             "action": [
@@ -545,14 +552,11 @@
         }
       },
       {
-        "index": 22,
-        "fields": {
-          "vis_exp": "0"
-        }
-      },
-      {
         "index": 23,
         "fields": {
+          "rect": {
+            "y": 104
+          },
           "text_key": "@PLATFORM_BACK_CAPS",
           "vis_exp": "1",
           "disabled_exp": "0",
@@ -652,8 +656,11 @@
         "fields": {
           "name": "map_row_0",
           "rect": {
-            "y": 28
+            "x": 140,
+            "y": 28,
+            "w": 200
           },
+          "text_align_x": -8,
           "text_key": "",
           "text_exp": "op 38 s:75695f6d61705f30 op 1",
           "vis_exp": "op 38 s:75695f6d61705f30 op 1 op 13 s:",
@@ -683,8 +690,11 @@
         "fields": {
           "name": "map_row_1",
           "rect": {
-            "y": 48
+            "x": 140,
+            "y": 48,
+            "w": 200
           },
+          "text_align_x": -8,
           "text_key": "",
           "text_exp": "op 38 s:75695f6d61705f31 op 1",
           "vis_exp": "op 38 s:75695f6d61705f31 op 1 op 13 s:",
@@ -714,8 +724,11 @@
         "fields": {
           "name": "map_row_2",
           "rect": {
-            "y": 68
+            "x": 140,
+            "y": 68,
+            "w": 200
           },
+          "text_align_x": -8,
           "text_key": "",
           "text_exp": "op 38 s:75695f6d61705f32 op 1",
           "vis_exp": "op 38 s:75695f6d61705f32 op 1 op 13 s:",
@@ -745,8 +758,11 @@
         "fields": {
           "name": "map_row_3",
           "rect": {
-            "y": 88
+            "x": 140,
+            "y": 88,
+            "w": 200
           },
+          "text_align_x": -8,
           "text_key": "",
           "text_exp": "op 38 s:75695f6d61705f33 op 1",
           "vis_exp": "op 38 s:75695f6d61705f33 op 1 op 13 s:",
@@ -776,8 +792,11 @@
         "fields": {
           "name": "map_row_4",
           "rect": {
-            "y": 108
+            "x": 140,
+            "y": 108,
+            "w": 200
           },
+          "text_align_x": -8,
           "text_key": "",
           "text_exp": "op 38 s:75695f6d61705f34 op 1",
           "vis_exp": "op 38 s:75695f6d61705f34 op 1 op 13 s:",
@@ -807,8 +826,11 @@
         "fields": {
           "name": "map_row_5",
           "rect": {
-            "y": 128
+            "x": 140,
+            "y": 128,
+            "w": 200
           },
+          "text_align_x": -8,
           "text_key": "",
           "text_exp": "op 38 s:75695f6d61705f35 op 1",
           "vis_exp": "op 38 s:75695f6d61705f35 op 1 op 13 s:",
@@ -838,8 +860,11 @@
         "fields": {
           "name": "map_row_6",
           "rect": {
-            "y": 148
+            "x": 140,
+            "y": 148,
+            "w": 200
           },
+          "text_align_x": -8,
           "text_key": "",
           "text_exp": "op 38 s:75695f6d61705f36 op 1",
           "vis_exp": "op 38 s:75695f6d61705f36 op 1 op 13 s:",
@@ -869,8 +894,11 @@
         "fields": {
           "name": "map_row_7",
           "rect": {
-            "y": 168
+            "x": 140,
+            "y": 168,
+            "w": 200
           },
+          "text_align_x": -8,
           "text_key": "",
           "text_exp": "op 38 s:75695f6d61705f37 op 1",
           "vis_exp": "op 38 s:75695f6d61705f37 op 1 op 13 s:",
@@ -900,8 +928,11 @@
         "fields": {
           "name": "map_row_8",
           "rect": {
-            "y": 188
+            "x": 140,
+            "y": 188,
+            "w": 200
           },
+          "text_align_x": -8,
           "text_key": "",
           "text_exp": "op 38 s:75695f6d61705f38 op 1",
           "vis_exp": "op 38 s:75695f6d61705f38 op 1 op 13 s:",
@@ -931,8 +962,11 @@
         "fields": {
           "name": "map_row_9",
           "rect": {
-            "y": 208
+            "x": 140,
+            "y": 208,
+            "w": 200
           },
+          "text_align_x": -8,
           "text_key": "",
           "text_exp": "op 38 s:75695f6d61705f39 op 1",
           "vis_exp": "op 38 s:75695f6d61705f39 op 1 op 13 s:",
@@ -998,11 +1032,14 @@
         "fields": {
           "name": "previous_page",
           "rect": {
-            "y": 244
+            "x": 140,
+            "y": 228,
+            "w": 200
           },
+          "text_align_x": -8,
           "text_key": "PREVIOUS PAGE",
           "text_exp": "",
-          "vis_exp": "1",
+          "vis_exp": "op 35 s:75695f6d61705f7061676564 op 1",
           "disabled_exp": "0",
           "dvar_flags": 0,
           "handlers": {
@@ -1029,11 +1066,14 @@
         "fields": {
           "name": "next_page",
           "rect": {
-            "y": 264
+            "x": 140,
+            "y": 248,
+            "w": 200
           },
+          "text_align_x": -8,
           "text_key": "NEXT PAGE",
           "text_exp": "",
-          "vis_exp": "1",
+          "vis_exp": "op 35 s:75695f6d61705f7061676564 op 1",
           "disabled_exp": "0",
           "dvar_flags": 0,
           "handlers": {
@@ -1054,7 +1094,367 @@
             ]
           }
         }
+      },
+    {
+      "index": 16,
+      "fields": {
+        "name": "map_pack_0",
+        "rect": {
+          "x": -64,
+          "y": 28,
+          "w": 200
+        },
+        "text_key": "",
+        "text_exp": "op 38 s:75695f6d61705f7061636b5f30 op 1",
+        "text_align_mode": 8,
+        "text_align_x": 68,
+        "vis_exp": "op 38 s:75695f6d61705f7061636b5f30 op 1 op 13 s:",
+        "disabled_exp": "0",
+        "dvar_flags": 0,
+        "float_exp": [
+          [
+            4,
+            "op 37 s:75695f6d61705f7061636b5f74696e745f30 op 1"
+          ],
+          [
+            6,
+            "op 37 s:75695f6d61705f7061636b5f74696e745f30 op 1"
+          ]
+        ],
+        "handlers": {
+          "action": [
+            {
+              "Script": "play mouse_click; exec \"ui_map_pack 0\";"
+            }
+          ],
+          "focus": [
+            {
+              "Script": "play mouse_over; setItemColor self backcolor 0 0 0 1;"
+            }
+          ],
+          "leave_focus": [
+            {
+              "Script": "setItemColor self backcolor 0 0 0 0;"
+            }
+          ]
+        }
       }
+    },
+    {
+      "index": 16,
+      "fields": {
+        "name": "map_pack_1",
+        "rect": {
+          "x": -64,
+          "y": 48,
+          "w": 200
+        },
+        "text_key": "",
+        "text_exp": "op 38 s:75695f6d61705f7061636b5f31 op 1",
+        "text_align_mode": 8,
+        "text_align_x": 68,
+        "vis_exp": "op 38 s:75695f6d61705f7061636b5f31 op 1 op 13 s:",
+        "disabled_exp": "0",
+        "dvar_flags": 0,
+        "float_exp": [
+          [
+            4,
+            "op 37 s:75695f6d61705f7061636b5f74696e745f31 op 1"
+          ],
+          [
+            6,
+            "op 37 s:75695f6d61705f7061636b5f74696e745f31 op 1"
+          ]
+        ],
+        "handlers": {
+          "action": [
+            {
+              "Script": "play mouse_click; exec \"ui_map_pack 1\";"
+            }
+          ],
+          "focus": [
+            {
+              "Script": "play mouse_over; setItemColor self backcolor 0 0 0 1;"
+            }
+          ],
+          "leave_focus": [
+            {
+              "Script": "setItemColor self backcolor 0 0 0 0;"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "index": 16,
+      "fields": {
+        "name": "map_pack_2",
+        "rect": {
+          "x": -64,
+          "y": 68,
+          "w": 200
+        },
+        "text_key": "",
+        "text_exp": "op 38 s:75695f6d61705f7061636b5f32 op 1",
+        "text_align_mode": 8,
+        "text_align_x": 68,
+        "vis_exp": "op 38 s:75695f6d61705f7061636b5f32 op 1 op 13 s:",
+        "disabled_exp": "0",
+        "dvar_flags": 0,
+        "float_exp": [
+          [
+            4,
+            "op 37 s:75695f6d61705f7061636b5f74696e745f32 op 1"
+          ],
+          [
+            6,
+            "op 37 s:75695f6d61705f7061636b5f74696e745f32 op 1"
+          ]
+        ],
+        "handlers": {
+          "action": [
+            {
+              "Script": "play mouse_click; exec \"ui_map_pack 2\";"
+            }
+          ],
+          "focus": [
+            {
+              "Script": "play mouse_over; setItemColor self backcolor 0 0 0 1;"
+            }
+          ],
+          "leave_focus": [
+            {
+              "Script": "setItemColor self backcolor 0 0 0 0;"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "index": 16,
+      "fields": {
+        "name": "map_pack_3",
+        "rect": {
+          "x": -64,
+          "y": 88,
+          "w": 200
+        },
+        "text_key": "",
+        "text_exp": "op 38 s:75695f6d61705f7061636b5f33 op 1",
+        "text_align_mode": 8,
+        "text_align_x": 68,
+        "vis_exp": "op 38 s:75695f6d61705f7061636b5f33 op 1 op 13 s:",
+        "disabled_exp": "0",
+        "dvar_flags": 0,
+        "float_exp": [
+          [
+            4,
+            "op 37 s:75695f6d61705f7061636b5f74696e745f33 op 1"
+          ],
+          [
+            6,
+            "op 37 s:75695f6d61705f7061636b5f74696e745f33 op 1"
+          ]
+        ],
+        "handlers": {
+          "action": [
+            {
+              "Script": "play mouse_click; exec \"ui_map_pack 3\";"
+            }
+          ],
+          "focus": [
+            {
+              "Script": "play mouse_over; setItemColor self backcolor 0 0 0 1;"
+            }
+          ],
+          "leave_focus": [
+            {
+              "Script": "setItemColor self backcolor 0 0 0 0;"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "index": 16,
+      "fields": {
+        "name": "map_pack_4",
+        "rect": {
+          "x": -64,
+          "y": 108,
+          "w": 200
+        },
+        "text_key": "",
+        "text_exp": "op 38 s:75695f6d61705f7061636b5f34 op 1",
+        "text_align_mode": 8,
+        "text_align_x": 68,
+        "vis_exp": "op 38 s:75695f6d61705f7061636b5f34 op 1 op 13 s:",
+        "disabled_exp": "0",
+        "dvar_flags": 0,
+        "float_exp": [
+          [
+            4,
+            "op 37 s:75695f6d61705f7061636b5f74696e745f34 op 1"
+          ],
+          [
+            6,
+            "op 37 s:75695f6d61705f7061636b5f74696e745f34 op 1"
+          ]
+        ],
+        "handlers": {
+          "action": [
+            {
+              "Script": "play mouse_click; exec \"ui_map_pack 4\";"
+            }
+          ],
+          "focus": [
+            {
+              "Script": "play mouse_over; setItemColor self backcolor 0 0 0 1;"
+            }
+          ],
+          "leave_focus": [
+            {
+              "Script": "setItemColor self backcolor 0 0 0 0;"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "index": 16,
+      "fields": {
+        "name": "map_pack_5",
+        "rect": {
+          "x": -64,
+          "y": 128,
+          "w": 200
+        },
+        "text_key": "",
+        "text_exp": "op 38 s:75695f6d61705f7061636b5f35 op 1",
+        "text_align_mode": 8,
+        "text_align_x": 68,
+        "vis_exp": "op 38 s:75695f6d61705f7061636b5f35 op 1 op 13 s:",
+        "disabled_exp": "0",
+        "dvar_flags": 0,
+        "float_exp": [
+          [
+            4,
+            "op 37 s:75695f6d61705f7061636b5f74696e745f35 op 1"
+          ],
+          [
+            6,
+            "op 37 s:75695f6d61705f7061636b5f74696e745f35 op 1"
+          ]
+        ],
+        "handlers": {
+          "action": [
+            {
+              "Script": "play mouse_click; exec \"ui_map_pack 5\";"
+            }
+          ],
+          "focus": [
+            {
+              "Script": "play mouse_over; setItemColor self backcolor 0 0 0 1;"
+            }
+          ],
+          "leave_focus": [
+            {
+              "Script": "setItemColor self backcolor 0 0 0 0;"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "index": 16,
+      "fields": {
+        "name": "map_pack_6",
+        "rect": {
+          "x": -64,
+          "y": 148,
+          "w": 200
+        },
+        "text_key": "",
+        "text_exp": "op 38 s:75695f6d61705f7061636b5f36 op 1",
+        "text_align_mode": 8,
+        "text_align_x": 68,
+        "vis_exp": "op 38 s:75695f6d61705f7061636b5f36 op 1 op 13 s:",
+        "disabled_exp": "0",
+        "dvar_flags": 0,
+        "float_exp": [
+          [
+            4,
+            "op 37 s:75695f6d61705f7061636b5f74696e745f36 op 1"
+          ],
+          [
+            6,
+            "op 37 s:75695f6d61705f7061636b5f74696e745f36 op 1"
+          ]
+        ],
+        "handlers": {
+          "action": [
+            {
+              "Script": "play mouse_click; exec \"ui_map_pack 6\";"
+            }
+          ],
+          "focus": [
+            {
+              "Script": "play mouse_over; setItemColor self backcolor 0 0 0 1;"
+            }
+          ],
+          "leave_focus": [
+            {
+              "Script": "setItemColor self backcolor 0 0 0 0;"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "index": 16,
+      "fields": {
+        "name": "map_pack_7",
+        "rect": {
+          "x": -64,
+          "y": 168,
+          "w": 200
+        },
+        "text_key": "",
+        "text_exp": "op 38 s:75695f6d61705f7061636b5f37 op 1",
+        "text_align_mode": 8,
+        "text_align_x": 68,
+        "vis_exp": "op 38 s:75695f6d61705f7061636b5f37 op 1 op 13 s:",
+        "disabled_exp": "0",
+        "dvar_flags": 0,
+        "float_exp": [
+          [
+            4,
+            "op 37 s:75695f6d61705f7061636b5f74696e745f37 op 1"
+          ],
+          [
+            6,
+            "op 37 s:75695f6d61705f7061636b5f74696e745f37 op 1"
+          ]
+        ],
+        "handlers": {
+          "action": [
+            {
+              "Script": "play mouse_click; exec \"ui_map_pack 7\";"
+            }
+          ],
+          "focus": [
+            {
+              "Script": "play mouse_over; setItemColor self backcolor 0 0 0 1;"
+            }
+          ],
+          "leave_focus": [
+            {
+              "Script": "setItemColor self backcolor 0 0 0 0;"
+            }
+          ]
+        }
+      }
+    }
     ]
   },
   {

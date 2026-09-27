@@ -791,6 +791,8 @@ pub struct ClientMatchState {
     pub(crate) location_selection: Option<LocationSelection>,
 
     pub(crate) controls: ScriptControls,
+
+    pub(crate) max_health: i32,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]

@@ -58,6 +58,17 @@ impl Iw5Lane {
                         arena.as_deref(),
                         stem,
                     );
+                    let settings = &loaded.facts.team_settings;
+                    loaded.facts.objective_visuals = crate::ObjectiveVisuals::from_faction_table(
+                        table,
+                        Some(
+                            settings
+                                .allies_charset
+                                .as_deref()
+                                .unwrap_or(IW5_DEFAULT_ALLIES),
+                        ),
+                        Some(settings.axis_charset.as_deref().unwrap_or(IW5_DEFAULT_AXIS)),
+                    );
                 }
                 match (
                     loaded.facts.team_settings.allies.as_ref(),
@@ -115,7 +126,7 @@ impl ZoneLane for Iw5Lane {
         path: &Path,
         image: &ZoneImage,
         progress: &LoadProgress,
-        _shared_surfaces: asset_model::SharedXModelSurfaces,
+        shared_surfaces: asset_model::SharedXModelSurfaces,
         material_seed: crate::MaterialCatalog,
         _common_film_visions: &mut std::collections::BTreeMap<
             String,
@@ -176,6 +187,7 @@ impl ZoneLane for Iw5Lane {
         let mut sink = ZoneWalkSink::default();
         let seeded_techsets = material_seed.technique_set_facts().to_vec();
         sink.seed_materials(material_seed);
+        sink.map_xmodels.shared_surfaces = shared_surfaces;
         sink.set_capture_zone(crate::ZoneOwner::from_zone_path(path));
         sink.set_capture_ns(crate::AssetNamespace::Iw5);
         sink.sound = Some(asset_audio::ZoneSoundCapture::for_map(
@@ -821,6 +833,8 @@ impl ZoneLane for Iw5Lane {
             world_weapons: sink.world_weapons,
             xanims: sink.xanims,
             light_defs,
+            scene_models: sink.scene_models,
+            shared_surfaces: sink.shared_surfaces,
             report,
             ..Default::default()
         }
@@ -897,3 +911,6 @@ impl ZoneLane for Iw5Lane {
         }
     }
 }
+
+const IW5_DEFAULT_ALLIES: &str = "sas_urban";
+const IW5_DEFAULT_AXIS: &str = "opforce_henchmen";

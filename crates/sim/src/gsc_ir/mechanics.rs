@@ -3,14 +3,27 @@ use super::runtime::raise;
 use super::*;
 use bevy_ecs::prelude::World;
 
-/// Script-driven entity mechanics: timed moves and entity/player links. They run
-/// before the VM each tick and settle native collision, so a thread woken by
-/// movedone already queries the final pose.
+/// Script-driven entity mechanics: timed moves, launched physics bodies and
+/// entity/player links. They run before the VM each tick and settle native
+/// collision, so a thread woken by movedone or physics_finished already
+/// queries the final pose.
 #[derive(Resource, Clone, Default)]
 pub(crate) struct Mechanics {
     motions: BTreeMap<u64, Vec<Motion>>,
+    bodies: BTreeMap<u64, Body>,
     finished: Vec<(u64, &'static str)>,
 }
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Body {
+    velocity: [f32; 3],
+    ticks: u32,
+}
+
+const TICK_S: f32 = crate::MATCH_TICK_MS as f32 / 1000.0;
+const SETTLE_TICKS: u32 = 200;
+const BODY_MINS: [f32; 3] = [-12.0, -12.0, 0.0];
+const BODY_MAXS: [f32; 3] = [12.0, 12.0, 24.0];
 
 impl Mechanics {
     pub(super) fn start(&mut self, object: u64, motion: Motion) {
@@ -25,8 +38,9 @@ impl Mechanics {
         }
     }
 
-    pub(super) fn clear(&mut self, object: u64) {
+    pub(super) fn launch(&mut self, object: u64, velocity: [f32; 3]) {
         self.motions.remove(&object);
+        self.bodies.insert(object, Body { velocity, ticks: 0 });
     }
 
     pub(super) fn velocity(&self, object: u64, now: i64) -> [f32; 3] {
@@ -48,6 +62,7 @@ pub(crate) fn advance_mechanics(world: &mut World) {
         return;
     }
     advance_motions(world, now);
+    advance_bodies(world);
     apply_entity_links(world);
     super::players::apply_player_links(world);
     super::presence::settle_collision(world);
@@ -64,7 +79,9 @@ pub(super) fn deliver_finished(world: &mut World) {
 fn advance_motions(world: &mut World, now: i64) {
     world.resource_scope::<Mechanics, _>(|world, mut mechanics| {
         let mut runtime = world.resource_mut::<Runtime>();
-        let Mechanics { motions, finished } = &mut *mechanics;
+        let Mechanics {
+            motions, finished, ..
+        } = &mut *mechanics;
         motions.retain(|object, _| runtime.entities.contains_key(object));
         for (object, list) in motions.iter_mut() {
             list.retain(|motion| {
@@ -78,6 +95,54 @@ fn advance_motions(world: &mut World, now: i64) {
             });
         }
         motions.retain(|_, list| !list.is_empty());
+    });
+}
+
+fn advance_bodies(world: &mut World) {
+    world.resource_scope::<Mechanics, _>(|world, mut mechanics| {
+        let Mechanics {
+            bodies, finished, ..
+        } = &mut *mechanics;
+        bodies.retain(|object, body| {
+            let (origin, angles) = {
+                let mut runtime = world.resource_mut::<Runtime>();
+                if !runtime.entities.contains_key(object) {
+                    return false;
+                }
+                match (
+                    runtime.object_field(*object, "origin"),
+                    runtime.object_field(*object, "angles"),
+                ) {
+                    (Value::Vector(o), Value::Vector(a)) => (o, a),
+                    (Value::Vector(o), _) => (o, [0.0; 3]),
+                    _ => return true,
+                }
+            };
+            body.velocity[2] -= GRAVITY * TICK_S;
+            let end: [f32; 3] = std::array::from_fn(|i| origin[i] + body.velocity[i] * TICK_S);
+            let trace = crate::frame::FrameWorld::from_world(world).trace_static_world(
+                origin,
+                end,
+                BODY_MINS,
+                BODY_MAXS,
+                crate::bullet_collision::MASK_PLAYER_SOLID,
+            );
+            let fraction = if trace.startsolid != 0 {
+                0.0
+            } else {
+                trace.fraction
+            };
+            let at: [f32; 3] = std::array::from_fn(|i| origin[i] + (end[i] - origin[i]) * fraction);
+            body.ticks += 1;
+            let rested = fraction < 1.0 || body.ticks >= SETTLE_TICKS;
+            let mut runtime = world.resource_mut::<Runtime>();
+            runtime.set_object_field(*object, "origin", Value::Vector(at));
+            if rested {
+                runtime.set_object_field(*object, "angles", Value::Vector([0.0, angles[1], 0.0]));
+                finished.push((*object, "physics_finished"));
+            }
+            !rested
+        });
     });
 }
 

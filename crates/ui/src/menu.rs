@@ -6,7 +6,23 @@ use crate::class_store::{
 };
 
 #[derive(Resource, Clone, Debug, Default)]
-pub struct MenuMapList(pub Vec<String>);
+pub struct MenuMapList(pub Vec<assets::MapPack>);
+
+impl MenuMapList {
+    pub fn maps(&self) -> impl Iterator<Item = &String> {
+        self.0.iter().flat_map(|pack| &pack.maps)
+    }
+
+    pub fn contains(&self, map: &str) -> bool {
+        self.maps().any(|installed| installed == map)
+    }
+
+    pub fn pack_of(&self, map: &str) -> Option<usize> {
+        self.0
+            .iter()
+            .position(|pack| pack.maps.iter().any(|installed| installed == map))
+    }
+}
 
 pub(crate) struct MenuPlugin;
 

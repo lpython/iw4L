@@ -127,12 +127,6 @@ pub(crate) struct Usable {
     pub barred: std::collections::BTreeSet<u32>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct Physics {
-    pub velocity: [f32; 3],
-    pub ticks: u32,
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct ScriptEntity {
     pub number: i32,
@@ -155,7 +149,6 @@ pub(crate) struct ScriptEntity {
     pub anim_op: Option<Option<Arc<str>>>,
     pub loop_sound: Option<Arc<str>>,
     pub usable: Option<Usable>,
-    pub physics: Option<Physics>,
 }
 
 pub(crate) const SPAWNED_PRESENCE_BASE: u32 = 0x4000_0000;
@@ -256,7 +249,6 @@ impl Runtime {
                 anim_op: None,
                 loop_sound: None,
                 usable: None,
-                physics: None,
             },
         );
         if kind != EntityKind::HudElem {
@@ -298,7 +290,6 @@ impl Runtime {
                 anim_op: None,
                 loop_sound: None,
                 usable: None,
-                physics: None,
             },
         );
         self.set_object_field(id, "classname", Value::string("player"));

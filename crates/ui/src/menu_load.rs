@@ -4,7 +4,7 @@ use frame::ClientSet;
 
 use assets::{
     GamesRoot, LoadProgress, LoadingPreviewSource, LocalizeCatalog, MatchLoadRequest,
-    find_runtime_common_mp, find_zone_file, list_mp_maps, load_mp_localized_strings,
+    find_runtime_common_mp, find_zone_file, list_mp_map_packs, load_mp_localized_strings,
 };
 
 use crate::class_select::ClassSelectOverlayOpen;
@@ -169,7 +169,7 @@ pub(crate) fn restore_menu_on_return(
     dismiss_loading_overlay(&mut commands, chrome.iter(), overlay_cams.iter(), false);
     if maps.0.is_empty() {
         if let Some(identity) = identity {
-            maps.0 = list_mp_maps(&assets::GamesRoot(identity.games_root.clone()));
+            maps.0 = list_mp_map_packs(&assets::GamesRoot(identity.games_root.clone()));
         }
     }
     diag::info!(Ui, "session: main menu enabled");

@@ -104,7 +104,7 @@ pub(crate) fn parse(script: &str) -> Vec<Command> {
             "exec" | "execnow" => (Command::Exec(arg(i + 1)), 2),
             "copydvar" => (Command::CopyDvar(arg(i + 1), arg(i + 2)), 3),
             "setdvar" => (Command::SetDvar(arg(i + 1), arg(i + 2)), 3),
-            "execondvarintvalue" => (
+            "execondvarintvalue" | "execnowondvarintvalue" => (
                 Command::ExecOnDvarIntValue {
                     dvar: arg(i + 1),
                     value: arg(i + 2).parse().unwrap_or(0),

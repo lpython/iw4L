@@ -64,7 +64,7 @@ pub(super) struct CommonCounts {
 #[derive(Clone)]
 pub(super) struct CommonProducts {
     pub(super) scripts: crate::ScriptSources,
-    pub(super) t5_scripts: crate::ScriptSources,
+    pub(super) t5_scene_models: crate::MapXModelSceneCatalog,
     pub(super) material_seed: MaterialCatalog,
     pub(super) shared_surfaces: asset_model::SharedXModelSurfaces,
     pub(super) scene_models: crate::MapXModelSceneCatalog,
@@ -90,6 +90,8 @@ pub(super) struct CommonProducts {
     pub(super) t5_xanims: XAnimBuild,
     pub(super) t5_fx: FxCatalog,
     pub(super) iw5_materials: MaterialCatalog,
+    pub(super) iw5_scene_models: crate::MapXModelSceneCatalog,
+    pub(super) iw5_shared_surfaces: asset_model::SharedXModelSurfaces,
     pub(super) strings: LocalizeCatalog,
     pub(super) counts: CommonCounts,
     pub(super) report: Vec<String>,
@@ -370,7 +372,7 @@ async fn prepare_common(key: CommonKey) -> Arc<CommonSet> {
         fx: t5_fx,
         projectiles: t5_projectiles,
         teamsets: t5_teamsets,
-        scripts: t5_scripts,
+        scene_models: t5_scene_models,
         images: t5_images,
         stats_tables: t5_stats,
         report: t5_report,
@@ -402,7 +404,11 @@ async fn prepare_common(key: CommonKey) -> Arc<CommonSet> {
     common_report.append(&mut foreign_report);
 
     let foreign_count = foreign_materials.materials.len();
-    material_seed.absorb_asset_population(foreign_materials);
+    let foreign_linked = material_seed.absorb_asset_population(foreign_materials);
+    let mut shared_bundle = shared_bundle;
+    if let Some(bundle) = &mut shared_bundle {
+        bundle.scene_models.remap_walk_materials(&foreign_linked);
+    }
 
     let mut shared_surfaces = asset_model::SharedXModelSurfaces::default();
     let mut common_scene_models = crate::MapXModelSceneCatalog::default();
@@ -522,6 +528,8 @@ async fn prepare_common(key: CommonKey) -> Arc<CommonSet> {
         xanims: iw5_xanims,
         materials: iw5_materials,
         stats_tables: iw5_census_stats,
+        scene_models: iw5_scene_models,
+        shared_surfaces: iw5_shared_surfaces,
     } = bundle;
     let iw5_stats = match iw5_stats_walk {
         Some(task) => {
@@ -649,7 +657,7 @@ async fn prepare_common(key: CommonKey) -> Arc<CommonSet> {
         key,
         products: CommonProducts {
             scripts,
-            t5_scripts,
+            t5_scene_models,
             material_seed,
             shared_surfaces,
             scene_models: common_scene_models,
@@ -674,6 +682,8 @@ async fn prepare_common(key: CommonKey) -> Arc<CommonSet> {
             t5_xanims,
             t5_fx,
             iw5_materials,
+            iw5_scene_models,
+            iw5_shared_surfaces,
             strings,
             counts: CommonCounts {
                 startup_count,

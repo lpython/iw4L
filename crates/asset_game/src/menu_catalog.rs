@@ -154,6 +154,7 @@ pub struct MenuDef {
     pub window_background: String,
     pub expr_dvars: String,
     pub fullscreen: i32,
+    pub focus_color: Option<[f32; 4]>,
 
     pub rect: MenuRect,
     pub items: Vec<MenuItem>,
@@ -347,7 +348,12 @@ impl MenuCatalog {
     }
 
     pub fn get(&self, name: &str) -> Option<&MenuDef> {
-        self.menus.get(name)
+        self.menus.get(name).or_else(|| {
+            self.menus
+                .iter()
+                .find(|(key, _)| key.eq_ignore_ascii_case(name))
+                .map(|(_, def)| def)
+        })
     }
 
     pub fn played_sound_aliases(&self) -> std::collections::BTreeSet<&str> {
@@ -1173,6 +1179,7 @@ impl AssetLinkSink for MenuSink {
         def.window_background = rec.window_background.to_owned();
         def.expr_dvars = rec.expr_dvars.to_owned();
         def.fullscreen = rec.fullscreen;
+        def.focus_color = Some(rec.focus_color);
         def.rect = MenuRect::from(rec.rect);
         Ok(())
     }
@@ -1315,6 +1322,29 @@ impl AssetLinkSink for MenuSink {
         };
         if let Some(item) = def.items.last_mut() {
             item.text_exp = dump.to_owned();
+        }
+        Ok(())
+    }
+
+    fn capture_item_choice(
+        &mut self,
+        menu: &str,
+        _item: &str,
+        label: &str,
+        value: fastfile_iw4::MenuChoiceValue<'_>,
+    ) -> fastfile_iw4::Result<()> {
+        let Some(def) = self.catalog.menus.get_mut(menu) else {
+            return Ok(());
+        };
+        if label.is_empty() {
+            return Ok(());
+        }
+        if let Some(item) = def.items.last_mut() {
+            let value = match value {
+                fastfile_iw4::MenuChoiceValue::Str(text) => text.to_owned(),
+                fastfile_iw4::MenuChoiceValue::Float(number) => number.to_string(),
+            };
+            item.choices.push((label.to_owned(), value));
         }
         Ok(())
     }

@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use assets::{
     LoadProgress, LoadingPreviewSource, LoadingScreen, MatchLoadRequest, NamespaceSoundIwd,
-    NamespaceTrees, find_runtime_common_mp, find_zone_file, list_mp_maps,
+    NamespaceTrees, find_runtime_common_mp, find_zone_file, list_mp_map_packs,
     load_mp_localized_strings, load_mp_sound_bank, load_ui_menu_catalog,
 };
 use audio::{SoundBank, SoundIwd};
@@ -229,10 +229,11 @@ fn run_menu(games: assets::GamesRoot, artifacts: PathBuf) {
             menu_report.join("\n")
         ));
     }
-    let maps = list_mp_maps(&games);
+    let maps = list_mp_map_packs(&games);
     diag::info!(
         Launch,
-        "menu: {} maps under {}",
+        "menu: {} maps in {} packs under {}",
+        maps.iter().map(|pack| pack.maps.len()).sum::<usize>(),
         maps.len(),
         games.0.display()
     );
